@@ -2,3 +2,4 @@
 common_voice
 */__pycache__/
 *.zip
+infore/*

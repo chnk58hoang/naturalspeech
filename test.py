@@ -1,4 +1,5 @@
-from phoneme import create_phoneme_vocab
+from data.dataset import Text2SpeechDataset, BucketSampler
+from data.utils import make_filelist
 
-vocab = create_phoneme_vocab('phoneme/all_phonemes.txt')
-print(vocab)
+
+make_filelist(data_dir='infore')
