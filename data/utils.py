@@ -1,4 +1,4 @@
-from phoneme import get_phoneme_sequence
+from phoneme import g2p
 from tqdm import tqdm
 import os
 
@@ -12,5 +12,5 @@ def make_filelist(data_dir):
                 text_path = file_path.replace('.wav', '.txt')
                 with open(text_path, 'r') as f:
                     text = f.read()
-                    phoneme_seq = get_phoneme_sequence(text)
+                    phoneme_seq = g2p(text=text, dialect='n')
                     fout.write(f'{file_path}|{phoneme_seq}\n')

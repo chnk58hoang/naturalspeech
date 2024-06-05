@@ -2,7 +2,6 @@ from torch.utils.data import Dataset, Sampler
 from torch.nn.utils.rnn import pad_sequence
 from typing import List
 from random import shuffle
-from phoneme import create_phoneme_vocab
 from utils.commons import intersperse
 import librosa
 import numpy as np
