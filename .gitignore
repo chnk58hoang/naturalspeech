@@ -1,6 +1,7 @@
 .vscode
 common_voice
-*/__pycache__/
+__pycache__
+.pyc
 *.zip
 infore/*
 .idea/

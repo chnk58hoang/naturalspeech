@@ -1,8 +1,10 @@
-import torch
-from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence
+from phonemizer.vnorm import PhonemeConverter
+from tqdm import tqdm
 
-x = torch.rand(20, 10)
-y = torch.rand(25, 10)
-
-z = pad_sequence(sequences=[x, y], batch_first=True)
-print(z.transpose(1, 2).size())
+f1 = open('phonemizer/vi_phone_dict.txt', 'r', encoding='utf-8')
+lines = f1.readlines()
+for line in tqdm(lines, desc='Converting phonemes ...',
+                 total=len(lines)):
+    word = line.split('\t')[0]
+    phone = line.split('\t')[1]
+    print(word, phone)
