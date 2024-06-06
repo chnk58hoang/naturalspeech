@@ -14,16 +14,13 @@
 # along with phonemizer. If not, see <http://www.gnu.org/licenses/>.
 """Implementation of punctuation processing"""
 
-
 import collections
 import re
 import six
 from phonemizer.utils import str2list
 
-
 # The punctuation marks considered by default.
 _DEFAULT_MARKS = ';:,.!?¡¿—…"«»“”'
-
 
 _MarkIndex = collections.namedtuple(
     '_mark_index', ['index', 'mark', 'position'])
@@ -44,6 +41,7 @@ class Punctuation:
         character. Default to Punctuation.default_marks().
 
     """
+
     def __init__(self, marks=_DEFAULT_MARKS):
         self._marks = None
         self._marks_re = None
@@ -76,6 +74,7 @@ class Punctuation:
         same type and punctuation removed.
 
         """
+
         def aux(text):
             return re.sub(self._marks_re, ' ', text).strip()
 

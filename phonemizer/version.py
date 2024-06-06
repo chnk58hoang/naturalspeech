@@ -14,7 +14,6 @@
 # along with phonemizer. If not, see <http://www.gnu.org/licenses/>.
 """Phonemizer version description"""
 
-
 import pkg_resources
 
 from phonemizer.backend import (
@@ -25,7 +24,7 @@ def version():
     """Return version information for front and backends"""
     # version of the phonemizer
     version = (
-        'phonemizer-' + pkg_resources.get_distribution('phonemizer').version)
+            'phonemizer-' + pkg_resources.get_distribution('phonemizer').version)
 
     # for each backend, check if it is available or not. If so get its version
     available = []

@@ -25,9 +25,8 @@ from phonemizer import phonemize, separator, version, logger, punctuation
 from phonemizer.backend import (
     EspeakBackend, EspeakMbrolaBackend, FestivalBackend, SegmentsBackend)
 
-
 BACKENDS_MAP = {b.name(): b for b in (
-        EspeakBackend, FestivalBackend, SegmentsBackend, EspeakMbrolaBackend)}
+    EspeakBackend, FestivalBackend, SegmentsBackend, EspeakMbrolaBackend)}
 
 
 class CatchExceptions(object):  # pragma: nocover
@@ -46,6 +45,7 @@ class CatchExceptions(object):  # pragma: nocover
         The function to wrap in a try/except block
 
     """
+
     def __init__(self, function):
         self.function = function
 
@@ -144,7 +144,7 @@ Exemples:
     group.add_argument(
         '-v', '--verbose', action='store_true',
         help='write all log messages to stderr '
-        '(displays only warnings by default).')
+             '(displays only warnings by default).')
     group.add_argument(
         '-q', '--quiet', action='store_true',
         help='do not display any log message, even warnings.')

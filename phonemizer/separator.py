@@ -17,6 +17,7 @@
 
 class Separator(object):
     """Defines phone, syllable and word boundary tokens"""
+
     def __init__(self, word=' ', syllable=None, phone=None):
         # check we have different separators, None excluded
         g1 = list(sep for sep in (phone, syllable, word) if sep)
@@ -33,9 +34,9 @@ class Separator(object):
 
     def __eq__(self, other):
         return (
-            self.phone == other.phone
-            and self.syllable == other.syllable
-            and self.word == other.word)
+                self.phone == other.phone
+                and self.syllable == other.syllable
+                and self.word == other.word)
 
     def __str__(self):
         def format(s):

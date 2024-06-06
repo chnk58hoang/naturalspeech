@@ -60,12 +60,12 @@ def chunks(text, n):
 
     """
     text = str2list(text)
-    size = int(max(1, len(text)/n))
+    size = int(max(1, len(text) / n))
     m = min(n, len(text))
 
-    chunks = [list2str(text[i*size:(i+1)*size]) for i in range(m-1)]
+    chunks = [list2str(text[i * size:(i + 1) * size]) for i in range(m - 1)]
 
-    last = list2str(text[(m-1)*size:])
+    last = list2str(text[(m - 1) * size:])
     if last:
         chunks.append(last)
 

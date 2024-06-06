@@ -1,5 +1,5 @@
-from phoneme import g2p
 from tqdm import tqdm
+from phonemizer.vnorm import PhonemeConverter
 import os
 
 
@@ -12,5 +12,6 @@ def make_filelist(data_dir):
                 text_path = file_path.replace('.wav', '.txt')
                 with open(text_path, 'r') as f:
                     text = f.read()
-                    phoneme_seq = g2p(text=text, dialect='n')
+                    phoneme_seq = PhonemeConverter(text=text)
+                    phoneme_seq = '/'.join(phoneme_seq)
                     fout.write(f'{file_path}|{phoneme_seq}\n')
