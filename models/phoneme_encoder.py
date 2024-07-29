@@ -55,6 +55,9 @@ class RelativeMultiHeadAttention(nn.Module):
         self.convv = nn.Conv1d(in_channels=hidden_channels,
                                out_channels=hidden_channels,
                                kernel_size=1)
+        self.convo = nn.Conv1d(in_channels=hidden_channels,
+                               out_channels=out_channels,
+                               kernel_size=1)
         self.dropout = nn.Dropout(p_dropout)
         if self.relative_window_size is not None:
             rel_dev = self.head_channels ** -0.5
