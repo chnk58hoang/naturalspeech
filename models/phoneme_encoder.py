@@ -69,6 +69,5 @@ class RelativeMultiHeadAttention(nn.Module):
         res = res.tranpose(2, 3).contigous().view(batch, self.hidden_channels, length)
 
 
-
-
-
+    def forward(self, x):
+        pass
