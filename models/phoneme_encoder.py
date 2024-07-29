@@ -67,7 +67,7 @@ class RelativeMultiHeadAttention(nn.Module):
         score = F.softmax(score, -1)
         res = torch.matmul(score, v)  # batch, num_head, length, head_channels
         res = res.tranpose(2, 3).contigous().view(batch, self.hidden_channels, length)
-
+        
 
     def forward(self, x):
         pass
