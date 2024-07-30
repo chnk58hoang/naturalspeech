@@ -70,7 +70,7 @@ class RelativeMultiHeadAttention(nn.Module):
             self.register_parameter(name='emb_rel_k', param=emb_rel_k)
             self.register_parameter(name='emb_rel_v', param=emb_rel_v)
 
-    def attention(self, q, k, v):
+    def attention(self, q, k, v, mask):
         """
         q, k, v: tensor (B, C, L)
         """
@@ -86,5 +86,10 @@ class RelativeMultiHeadAttention(nn.Module):
         res = res.tranpose(2, 3).contigous().view(batch, self.hidden_channels, length)
         return res
 
-    def forward(self, x):
-        pass
+    def forward(self, x, attn_mask=None):
+        q = self.convq(x)
+        k = self.convk(x)
+        v = self.convv(x)
+        x, self.attn = self.attention(q, k, v, attn_mask)
+        x = self.convo(x)
+        return x
