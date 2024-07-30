@@ -82,19 +82,56 @@ class RelativeMultiHeadAttention(nn.Module):
         # Raw attention score
         score = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(head_channels)
         if self.relative_window_size is not None:
-            # Compute relative position embedding for local attention
-            # step1: get relative key embeddings aka Er matrix in the paper
-            rel_emb_k = self._get_relative_key_embeddings(self.emb_rel_k, length)  # num_head, length, head_channels
-            s_rel = torch.matmul(q, rel_emb_k.unsqueeze(0).transpose(2, 3))
-            # step2: convert relative embeddings to absolute position embeddings
-            
-
+            # Compute relative position embedding for attention score (keys)
+            # step 1: get relative key embeddings aka Er matrix in the paper
+            rel_emb_k = self._get_relative_key_embeddings(self.emb_rel_k, length)  # num_head, 2*length - 1, head_channels
+            s_rel = torch.matmul(q, rel_emb_k.unsqueeze(0).transpose(2, 3))  # batch, num_head, length, 2*length-1
+            # step 2: convert relative embeddings to absolute position embeddings
+            s_rel = self._relative_to_absolute(s_rel)  # batch, num_head, length, length
+            # step 3: add converted position embeddings with original raw attention score:
+            score = score + s_rel / math.sqrt(self.head_channels)
+        if mask is not None:
+            # Use masked attention
+            score = score.masked_fill(mask==0, value=-1e5)
         score = F.softmax(score, -1)
         score = self.dropout(score)
         res = torch.matmul(score, v)  # batch, num_head, length, head_channels
-        res = res.tranpose(2, 3).contigous().view(batch, self.hidden_channels, length)
-        return res
+        # relative positition embedding for values
+        if self.relative_window_size is not None:
+            # step 1: convert absolute attention score to relative
+            relative_weights = self._absolute_to_relative(score)
+            rel_emb_v = self._get_relative_key_embeddings(self.emb_rel_v, length)
+            relative_v = torch.matmul(relative_weights, rel_emb_v.unsqueeze(0).transpose(2, 3))
+            res = res + relative_v
+        res = res.transpose(2, 3).contiguous().view(batch, self.hidden_channels, length)
+        return res, score
 
+    @staticmethod
+    def _relative_to_absolute(s_rel: torch.Tensor):
+        """
+        s_rel: (batch, num_head, length, 2*length-1)
+        return: batch, num_head, length, length
+        """
+        batch, num_head, length, _ = s_rel.size()
+        s_rel = F.pad(s_rel, [0, 1, 0, 0, 0, 0, 0, 0])
+        s_rel = s_rel.flatten(2, 3)
+        s_rel = F.pad(s_rel, [0, length - 1, 0, 0, 0, 0])
+        s_rel = s_rel.view(batch, num_head, length + 1, 2 * length - 1)
+        s_rel = s_rel[:, :, :length, length - 1:]
+        return s_rel
+
+    @staticmethod
+    def _absolute_to_relative(score: torch.Tensor):
+        """
+        score: (batch, num_head, length, length)
+        return: batch, num_head, length, 2*length - 1
+        """
+        batch, num_head, length, _ = score.size()
+        score = F.pad(score, [0, length - 1, 0, 0, 0, 0, 0, 0])  # batch, num_head, length, 2*length - 1
+        score = score.view(batch, num_head, -1)  # batch, num_head, (2length-1) * length
+        score = F.pad(score, [length, 0, 0, 0, 0, 0])  # batch, num_head, 2length * length
+        score = score.view(batch, num_head, length, 2*length)[: ,:, :, 1:]
+        return score
 
     def _get_relative_key_embeddings(self, relative_embeddings, length):
         start_slice_idx = max(0, (self.relative_window_size - length + 1))
