@@ -38,6 +38,7 @@ class WaveNet(nn.Module):
             self.x11_conv1d_layers.append(layer)
 
     def fuse_tanh_sigmoid(self, x):
+        # split the tensor into two halves along the channel dimension
         x_tanh = torch.tanh(x[:, : self.hidden_channels, :])
         x_sigmoid = torch.sigmoid(x[:, self.hidden_channels:, :])
         res = x_tanh * x_sigmoid
