@@ -25,6 +25,9 @@ class LayerNorm(nn.Module):
         return x
 
 
+class ActNorm(nn.Module):
+    
+
 if __name__ == '__main__':
     x = torch.rand(3, 2, 5)
     norm = LayerNorm(2)
