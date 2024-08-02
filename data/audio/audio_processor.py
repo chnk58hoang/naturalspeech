@@ -1,4 +1,4 @@
-from utils import (load_wav_to_torch, spectrogram_torch, build_mel_filterbank)
+from .utils import (load_wav_to_torch, spectrogram_torch, build_mel_filterbank)
 import torch
 
 
@@ -24,6 +24,7 @@ class AudioProcessor():
         self.mel_filter_bank = build_mel_filterbank(n_fft=n_fft,
                                                     mel_fmin=mel_fmin,
                                                     mel_fmax=mel_fmax,
+                                                    n_mels=n_mels,
                                                     sample_rate=sample_rate)
 
     def load_audio(self, audio_path: str):
@@ -31,6 +32,12 @@ class AudioProcessor():
         return audio, sampling_rate
 
     def get_spectrogram(self, audio: torch.Tensor):
-        return spectrogram_torch(audio, self.n_fft,
+        audio_norm = audio / self.max_wav_value
+        audio_norm = audio_norm.unsqueeze(0)
+        return spectrogram_torch(audio_norm, self.n_fft,
                                  self.win_length, self.hop_length)
-    
+
+    def get_mel_spectrogram(self, audio: torch.Tensor):
+        spectrogram = self.get_spectrogram(audio)
+        mel_spectrogram = torch.matmul(self.mel_filter_bank, spectrogram)
+        return mel_spectrogram

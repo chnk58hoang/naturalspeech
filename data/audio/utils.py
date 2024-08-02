@@ -1,6 +1,6 @@
 from scipy.io.wavfile import read
+from librosa.filters import mel
 import torch.nn.functional as F
-import torchaudio.functional as F_audio
 import sox
 import torch
 import numpy as np
@@ -28,8 +28,10 @@ def spectrogram_torch(audio: torch.Tensor,
                       center=False,
                       pad_mode='reflect',
                       normalized=normalize,
-                      onesided=True)
+                      onesided=True,
+                      return_complex=False)
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
+    spec = spec.squeeze(0)
     return spec
 
 
@@ -38,11 +40,12 @@ def build_mel_filterbank(n_fft: int,
                          mel_fmax: int,
                          n_mels: int,
                          sample_rate: int):
-    mel_filterbank = F_audio.melscale_fbanks(n_freqs=(n_fft // 2) + 1,
-                                             f_min=mel_fmin,
-                                             f_max=mel_fmax,
-                                             n_mels=n_mels,
-                                             sample_rate=sample_rate)
+    mel_filterbank = mel(sr=sample_rate,
+                         n_fft=n_fft,
+                         n_mels=n_mels,
+                         fmin=mel_fmin,
+                         fmax=mel_fmax)
+    mel_filterbank = torch.from_numpy(mel_filterbank)
     return mel_filterbank
 
 
