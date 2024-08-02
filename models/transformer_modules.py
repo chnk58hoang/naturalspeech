@@ -183,6 +183,7 @@ class RelativeAttentionTransformerBlock(nn.Module):
                  out_channels: int,
                  hidden_channels: int,
                  p_dropout: float,
+                 kernel_size: int,
                  relative_window_size: int):
         super().__init__()
         self.rel_attention = RelativeMultiHeadAttention(num_heads=num_heads,
@@ -193,7 +194,8 @@ class RelativeAttentionTransformerBlock(nn.Module):
         self.ffn = FeedForwardNetwork(in_channels=hidden_channels,
                                       out_channels=out_channels,
                                       hidden_channels=hidden_channels,
-                                      p_dropout=p_dropout)
+                                      p_dropout=p_dropout,
+                                      kernel_size=kernel_size)
         self.layer_norm1 = LayerNorm(hidden_channels)
         self.layer_norm2 = LayerNorm(out_channels)
 

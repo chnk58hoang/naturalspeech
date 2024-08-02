@@ -6,11 +6,12 @@ class Conv1dNormBlock(nn.Module):
     def __init__(self,
                  in_channels: int,
                  hidden_channels: int,
+                 kerenl_size: int = 1,
                  ) -> None:
         super().__init__()
         self.conv = nn.Conv1d(in_channels=in_channels,
                               out_channels=hidden_channels,
-                              kernel_size=1)
+                              kernel_size=kerenl_size)
         self.layer_norm = LayerNorm(hidden_channels)
         self.relu = nn.ReLU()
 

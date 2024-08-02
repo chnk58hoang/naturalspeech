@@ -8,6 +8,7 @@ class WaveNet(nn.Module):
                  dilation_rate: int,
                  in_channels: int,
                  hidden_channels: int,
+                 kernel_size: int,
                  p_dropout: float
                  ) -> None:
         super().__init__()
@@ -21,10 +22,20 @@ class WaveNet(nn.Module):
 
         for i in range(self.num_layers):
             dilation = self.dilation_rate ** i
-            self.dilated_conv_layers.append(nn.Conv1d(in_channels=self.in_channels,
-                                                      out_channels=self.hidden_channels * 2,
-                                                      kernel_size=1,
-                                                      dilation=dilation))
+            padding = int((kernel_size * dilation - dilation) / 2)
+            if i == 0:
+                dilated_layer = nn.Conv1d(in_channels=self.in_channels,
+                                          out_channels=self.hidden_channels * 2,
+                                          kernel_size=kernel_size,
+                                          dilation=dilation,
+                                          padding=padding)
+            else:
+                dilated_layer = nn.Conv1d(in_channels=self.hidden_channels,
+                                          out_channels=self.hidden_channels * 2,
+                                          kernel_size=kernel_size,
+                                          dilation=dilation,
+                                          padding=padding)
+            self.dilated_conv_layers.append(dilated_layer)
             if i < self.num_layers - 1:
                 layer = nn.Conv1d(in_channels=self.hidden_channels,
                                   out_channels=self.hidden_channels * 2,
@@ -60,7 +71,7 @@ class WaveNet(nn.Module):
             x_fused = self.fuse_tanh_sigmoid(x_in)
             x_fused = self.x11_conv1d_layers[i](x_fused)
             if i < self.num_layers - 1:
-                x = (x + x_fused[:, : self.hidden_channels, :])
+                x = (x + x_fused[:, :self.hidden_channels, :])
                 x *= x_mask
                 output = output + x_fused[:, self.hidden_channels:, :]
             else:

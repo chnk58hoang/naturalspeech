@@ -23,13 +23,3 @@ class LayerNorm(nn.Module):
         x = (x - mean) / std
         x = self.gamma * x + self.beta
         return x
-
-
-class ActNorm(nn.Module):
-    
-
-if __name__ == '__main__':
-    x = torch.rand(3, 2, 5)
-    norm = LayerNorm(2)
-    print(norm(x))
-    print(x)

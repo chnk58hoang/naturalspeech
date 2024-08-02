@@ -1,5 +1,5 @@
 from torch import nn
-from wavenet import WaveNet
+from .wavenet import WaveNet
 import torch
 
 
@@ -8,6 +8,7 @@ class ResidualCouplingBlock(nn.Module):
                  num_layers: int,
                  dilation_rate: int,
                  hidden_channels: int,
+                 kernel_size: int,
                  p_dropout: float,
                  mean_only: bool = False) -> None:
         super().__init__()
@@ -18,6 +19,7 @@ class ResidualCouplingBlock(nn.Module):
                                dilation_rate=dilation_rate,
                                in_channels=hidden_channels,
                                hidden_channels=hidden_channels,
+                               kernel_size=kernel_size,
                                p_dropout=p_dropout)
         self.pre_conv = nn.Conv1d(in_channels=self.half_channels,
                                   out_channels=hidden_channels,

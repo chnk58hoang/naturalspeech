@@ -1,6 +1,5 @@
 from torch import nn
 from transformer_modules import RelativeAttentionTransformerBlock
-from torch.nn import functional as F
 import torch
 import math
 
@@ -11,6 +10,7 @@ class PhonemeEncoder(nn.Module):
                  hidden_channels: int,
                  out_channels: int,
                  num_heads: int,
+                 kernel_size: int,
                  relative_windown_size: int,
                  p_dropout: float,
                  num_layers: int,) -> None:
@@ -31,6 +31,7 @@ class PhonemeEncoder(nn.Module):
                                                                              out_channels=hidden_channels,
                                                                              hidden_channels=hidden_channels,
                                                                              p_dropout=p_dropout,
+                                                                             kernel_size=kernel_size,
                                                                              relative_window_size=relative_windown_size))
 
     def forward(self, x, x_mask):
@@ -55,6 +56,7 @@ if __name__ == "__main__":
                            num_heads=2,
                            relative_windown_size=3,
                            p_dropout=0.1,
+                           kernel_size=3,
                            num_layers=2)
     x, mean, log_std, x_mask = model(x, x_mask)
     print(x.size(), mean.size(), log_std.size(), x_mask.size())

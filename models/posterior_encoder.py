@@ -10,6 +10,7 @@ class PosteriorEncoder(nn.Module):
                  dilation_rate,
                  in_channels: int,
                  hidden_channels: int,
+                 kernel_size: int,
                  p_dropout: float):
         super().__init__()
         self.hidden_channels = hidden_channels
@@ -23,6 +24,7 @@ class PosteriorEncoder(nn.Module):
                                dilation_rate=dilation_rate,
                                in_channels=hidden_channels,
                                hidden_channels=hidden_channels,
+                               kernel_size=kernel_size,
                                p_dropout=p_dropout)
 
     def forward(self,
@@ -53,5 +55,6 @@ model = PosteriorEncoder(num_layers=16,
                          dilation_rate=1,
                          in_channels=10,
                          hidden_channels=20,
+                         kernel_size=3,
                          p_dropout=0.5)
 res = model(x, x_lengths)
