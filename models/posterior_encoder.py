@@ -1,6 +1,6 @@
 from torch import nn
-from wavenet import WaveNet
-from utils import get_sequence_mask
+from .wavenet import WaveNet
+from .utils import get_sequence_mask
 import torch
 
 

@@ -4,3 +4,4 @@ test.py
 *.wav
 *.txt
 .vscode
+*.json

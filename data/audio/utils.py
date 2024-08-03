@@ -3,6 +3,7 @@ from librosa.filters import mel
 import torch.nn.functional as F
 import sox
 import torch
+import json
 import numpy as np
 
 
@@ -31,7 +32,6 @@ def spectrogram_torch(audio: torch.Tensor,
                       onesided=True,
                       return_complex=False)
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-9)
-    spec = spec.squeeze(0)
     return spec
 
 
@@ -61,3 +61,4 @@ def resample_and_convert(file_path: str,
 
 def get_duration(file_path: str):
     return sox.file_info.duration(file_path)
+
