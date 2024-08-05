@@ -6,17 +6,20 @@ import torch
 class DurationPredictor(nn.Module):
     def __init__(self,
                  hidden_channels: int,
+                 kernel_size: int,
                  p_dropout: float) -> None:
         super().__init__()
         self.conv1 = Conv1dNormBlock(in_channels=hidden_channels,
                                      hidden_channels=hidden_channels,
+                                     kerenl_size=kernel_size,
                                      )
         self.conv2 = Conv1dNormBlock(in_channels=hidden_channels,
                                      hidden_channels=hidden_channels,
+                                     kerenl_size=kernel_size,
                                      )
-        self.conv3 = Conv1dNormBlock(in_channels=hidden_channels,
-                                     hidden_channels=1,
-                                     )
+        self.conv3 = nn.Conv1d(in_channels=hidden_channels,
+                               out_channels=1,
+                               kernel_size=kernel_size)
         self.dropout = nn.Dropout(p_dropout)
 
     def forward(self, x, x_mask):
@@ -28,7 +31,7 @@ class DurationPredictor(nn.Module):
         x = self.dropout(x)
         x = self.conv2(x, x_mask)
         x = self.dropout(x)
-        x = self.conv3(x, x_mask)
+        x = self.conv3(x * x_mask)
         return x
 
 
@@ -41,13 +44,20 @@ class LeanableUpsampler(nn.Module):
                 phoneme: torch.Tensor,
                 frame: torch.Tensor):
         """
-        durations: tensor (B, L)
+        durations: tensor (B, L_phone)
         phoneme: tensor (B, phoneme_dimension, L_phone)
         frame: tensor (B, frame_dimension, L_frame)
         """
-        phone_length = phoneme.size(-1)
+        batch, _, phone_length = phoneme.size()
         frame_length = frame.size(-1)
-        accumulated_durations = torch.cumsum(durations, dim=-1)
+        sum_duration = torch.cumsum(durations, dim=-1)
+        sk = (sum_duration - durations).unsqueeze(1)
+        t_frame_arrange = (torch.arange(1, frame_length + 1)
+                           .unsqueeze(0)
+                           .unsqueeze(-1)
+                           .expand(batch, frame_length, -1))
+        start_matrix = t_frame_arrange - sk
+        end_matrix = sum_duration.unsqueeze(1) - sk
 
 
 
