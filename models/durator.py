@@ -1,5 +1,6 @@
 from torch import nn
 from convolutions import Conv1dNormBlock
+import torch
 
 
 class DurationPredictor(nn.Module):
@@ -29,6 +30,25 @@ class DurationPredictor(nn.Module):
         x = self.dropout(x)
         x = self.conv3(x, x_mask)
         return x
+
+
+class LeanableUpsampler(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def forward(self,
+                durations: torch.Tensor,
+                phoneme: torch.Tensor,
+                frame: torch.Tensor):
+        """
+        durations: tensor (B, L)
+        phoneme: tensor (B, phoneme_dimension, L_phone)
+        frame: tensor (B, frame_dimension, L_frame)
+        """
+        phone_length = phoneme.size(-1)
+        frame_length = frame.size(-1)
+        accumulated_durations = torch.cumsum(durations, dim=-1)
+
 
 
 if __name__ == '__main__':
