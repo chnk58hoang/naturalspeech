@@ -1,5 +1,5 @@
 from torch import nn
-from convolutions import Conv1dNormBlock
+from convolutions import ConvReluNormBlock, ConvSwishBlock
 import torch
 
 
@@ -9,14 +9,12 @@ class DurationPredictor(nn.Module):
                  kernel_size: int,
                  p_dropout: float) -> None:
         super().__init__()
-        self.conv1 = Conv1dNormBlock(in_channels=hidden_channels,
-                                     hidden_channels=hidden_channels,
-                                     kerenl_size=kernel_size,
-                                     )
-        self.conv2 = Conv1dNormBlock(in_channels=hidden_channels,
-                                     hidden_channels=hidden_channels,
-                                     kerenl_size=kernel_size,
-                                     )
+        self.conv1 = ConvReluNormBlock(in_channels=hidden_channels,
+                                       hidden_channels=hidden_channels,
+                                       kerenl_size=kernel_size)
+        self.conv2 = ConvReluNormBlock(in_channels=hidden_channels,
+                                       hidden_channels=hidden_channels,
+                                       kerenl_size=kernel_size)
         self.conv3 = nn.Conv1d(in_channels=hidden_channels,
                                out_channels=1,
                                kernel_size=kernel_size)
@@ -36,8 +34,21 @@ class DurationPredictor(nn.Module):
 
 
 class LeanableUpsampler(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self,
+                 phoneme_dimension: int,
+                 kernel_size: int) -> None:
+        super().__init__()
+        self.proj_w = nn.Linear(in_features=phoneme_dimension,
+                                out_features=phoneme_dimension) 
+        self.conv_w = ConvSwishBlock(in_channels=phoneme_dimension,
+                                     out_channels=8,
+                                     kernel_size=kernel_size)
+        self.proj_c = nn.Linear(in_features=phoneme_dimension,
+                                out_features=phoneme_dimension)
+        self.conv_c = ConvSwishBlock(in_channels=phoneme_dimension,
+                                     out_channels=8,
+                                     kernel_size=kernel_size)        
+
 
     def forward(self,
                 durations: torch.Tensor,
