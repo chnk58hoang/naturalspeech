@@ -33,7 +33,7 @@ class DurationPredictor(nn.Module):
         return x
 
 
-class LeanableUpsampler(nn.Module):
+class LearnableUpsampler(nn.Module):
     def __init__(self,
                  phoneme_dimension: int,
                  kernel_size: int) -> None:
@@ -52,15 +52,13 @@ class LeanableUpsampler(nn.Module):
 
     def forward(self,
                 durations: torch.Tensor,
-                phoneme: torch.Tensor,
-                frame: torch.Tensor):
+                phoneme: torch.Tensor):
         """
         durations: tensor (B, L_phone)
         phoneme: tensor (B, phoneme_dimension, L_phone)
-        frame: tensor (B, frame_dimension, L_frame)
         """
         batch, _, phone_length = phoneme.size()
-        frame_length = frame.size(-1)
+        frame_length = torch.round(durations.sum(dim=-1)).dtype(torch.LongTensor)
         sum_duration = torch.cumsum(durations, dim=-1)
         sk = (sum_duration - durations).unsqueeze(1)
         t_frame_arrange = (torch.arange(1, frame_length + 1)
