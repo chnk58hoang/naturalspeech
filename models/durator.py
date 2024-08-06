@@ -1,4 +1,5 @@
 from torch import nn
+from utils import get_sequence_mask
 from convolutions import ConvReluNormBlock, ConvSwishBlock
 import torch
 
@@ -36,7 +37,8 @@ class DurationPredictor(nn.Module):
 class LearnableUpsampler(nn.Module):
     def __init__(self,
                  phoneme_dimension: int,
-                 kernel_size: int) -> None:
+                 kernel_size: int,
+                 max_frame_length: int = 1000) -> None:
         super().__init__()
         self.proj_w = nn.Linear(in_features=phoneme_dimension,
                                 out_features=phoneme_dimension) 
@@ -47,26 +49,64 @@ class LearnableUpsampler(nn.Module):
                                 out_features=phoneme_dimension)
         self.conv_c = ConvSwishBlock(in_channels=phoneme_dimension,
                                      out_channels=8,
-                                     kernel_size=kernel_size)        
+                                     kernel_size=kernel_size)
+        self.max_frame_length = max_frame_length
 
-
-    def forward(self,
-                durations: torch.Tensor,
-                phoneme: torch.Tensor):
+    def get_matrics_and_masks(self,
+                              durations: torch.Tensor,
+                              phoneme: torch.Tensor,
+                              phoneme_mask: torch.Tensor,
+                              ):
         """
         durations: tensor (B, L_phone)
         phoneme: tensor (B, phoneme_dimension, L_phone)
+        phoneme_mask: tensor (B, 1, L_phone)
         """
         batch, _, phone_length = phoneme.size()
-        frame_length = torch.round(durations.sum(dim=-1)).dtype(torch.LongTensor)
+        frame_lengths = torch.round(durations.sum(dim=-1)).dtype(torch.LongTensor)  # batch
+        max_frame_length = frame_lengths.max().item()
+        # prepare frame mask, phoneme_mask
+        frame_mask = get_sequence_mask(frame_lengths, self.max_frame_length)
+        frame_mask_ = (frame_mask.unsqueeze(-1)
+                       .expand(-1, -1, phone_length)
+                       .to(phoneme.device))  # (batch, max_frame_length, phone_length)
+        phoneme_mask_ = (phoneme_mask.expand(-1, max_frame_length, -1)
+                         .to(phoneme.device))  # (batch, max_frame_length, phone_length)
+        # get matrix attention mask
+        attn_mask = torch.zeros(batch, max_frame_length, phone_length).to(phoneme.device)  # (batch, max_frame_length, phone_length)
+        attn_mask = attn_mask.masked_fill(frame_mask_, 1.0)
+        attn_mask = attn_mask.masked_fill(phoneme_mask_, 1.0)
+        # Compute start and end duration matrices
         sum_duration = torch.cumsum(durations, dim=-1)
         sk = (sum_duration - durations).unsqueeze(1)
-        t_frame_arrange = (torch.arange(1, frame_length + 1)
+        t_frame_arrange = (torch.arange(1, max_frame_length + 1)
                            .unsqueeze(0)
                            .unsqueeze(-1)
-                           .expand(batch, frame_length, -1))
-        start_matrix = t_frame_arrange - sk
-        end_matrix = sum_duration.unsqueeze(1) - sk
+                           .expand(batch, max_frame_length, -1))
+        start_matrix = t_frame_arrange - sk  # batch, max_frame_length, phone_length
+        end_matrix = sum_duration.unsqueeze(1) - sk  # batch, max_frame_length, phone_length
+        # Mask start and end matrices
+        start_matrix = start_matrix.masked_fill(~attn_mask, 0)
+        end_matrix = end_matrix.masked_fill(~attn_mask, 0)
+
+        return start_matrix, end_matrix, attn_mask, frame_mask_, phoneme_mask_
+
+    def forward(self,
+                durations: torch.Tensor,
+                phoneme: torch.Tensor,
+                phoneme_mask: torch.Tensor,
+                ):
+        """
+        durations: tensor (B, L_phone)
+        phoneme: tensor (B, phoneme_dimension, L_phone)
+        phoneme_mask: tensor (B, 1, L_phone)
+        """
+        (start_matrix, end_matrix,
+         attn_mask, frame_mask,
+         phoneme_mask) = self.prepare_matrix_and_mask(durations, phoneme, phoneme_mask)
+        phoneme = phoneme.transpose(1, 2)  # (B, L_phone, phoneme_dimension)
+        self.conv_w(self.proj_w(phoneme).transpose(1, 2), phoneme_mask)
+        
 
 
 

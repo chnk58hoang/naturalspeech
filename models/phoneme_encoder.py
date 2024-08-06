@@ -38,13 +38,14 @@ class PhonemeEncoder(nn.Module):
         """
         Args:
             x: tensor (B, L)
-            x_mask: tensor (B, 1, L)
+            x_mask: tensor (B, L)
         Return:
             x: tensor (B, hidden_channels, L)
             mean: tensor (B, out_channels, L)
             log_std: tensor (B, out_channels, L)
             x_mask: tensor (B, 1, L)
         """
+        x_mask = x_mask.unsqueeze(1)
         x = self.embedding(x).transpose(1, 2) * math.sqrt(self.hidden_channels)
         for i in range(self.num_layers):
             x = self.transformer_blocks[i](x, x_mask)
@@ -55,7 +56,7 @@ class PhonemeEncoder(nn.Module):
 
 if __name__ == "__main__":
     x = torch.randint(0, 10, (3, 20))
-    x_mask = torch.ones(3, 1, 20)
+    x_mask = torch.ones(3, 20)
     model = PhonemeEncoder(num_phonemes=10,
                            hidden_channels=32,
                            out_channels=8,

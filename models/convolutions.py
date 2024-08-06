@@ -37,6 +37,6 @@ class ConvSwishBlock(nn.Module):
 
     def forward(self, x, x_mask):
         x = self.conv(x) * x_mask
-        x = self.swith(x)
+        x = self.swish(x)
         x = self.layer_norm(x)
         return x
