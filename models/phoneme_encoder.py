@@ -36,8 +36,14 @@ class PhonemeEncoder(nn.Module):
 
     def forward(self, x, x_mask):
         """
-        x: tensor (B, L)
-        x_mask: tensor (B, 1, L)
+        Args:
+            x: tensor (B, L)
+            x_mask: tensor (B, 1, L)
+        Return:
+            x: tensor (B, hidden_channels, L)
+            mean: tensor (B, out_channels, L)
+            log_std: tensor (B, out_channels, L)
+            x_mask: tensor (B, 1, L)
         """
         x = self.embedding(x).transpose(1, 2) * math.sqrt(self.hidden_channels)
         for i in range(self.num_layers):
