@@ -1,6 +1,7 @@
 from torch import nn
 from utils import get_sequence_mask
-from convolutions import ConvReluNormBlock, ConvSwishBlock
+from models.sub_modules import ConvReluNormBlock, ConvSwishBlock, LinearSwish
+import numpy as np
 import torch
 
 
@@ -38,18 +39,30 @@ class LearnableUpsampler(nn.Module):
     def __init__(self,
                  phoneme_dimension: int,
                  kernel_size: int,
+                 dim_w: int = 4,
+                 dim_c: int = 2,
                  max_frame_length: int = 1000) -> None:
         super().__init__()
-        self.proj_w = nn.Linear(in_features=phoneme_dimension,
-                                out_features=phoneme_dimension) 
+        self.proj_w = nn.Conv1d(in_channels=phoneme_dimension,
+                                out_channels=phoneme_dimension,
+                                kernel_size=1)
         self.conv_w = ConvSwishBlock(in_channels=phoneme_dimension,
                                      out_channels=8,
                                      kernel_size=kernel_size)
-        self.proj_c = nn.Linear(in_features=phoneme_dimension,
-                                out_features=phoneme_dimension)
+        self.mlp_w = LinearSwish(in_features=10,
+                                 out_features=dim_w)
+        self.linear_w = nn.Linear(in_features=phoneme_dimension * dim_w,
+                                  out_features=phoneme_dimension)
+        self.proj_c = nn.Conv1d(in_channels=phoneme_dimension,
+                                out_channels=phoneme_dimension,
+                                kernel_size=1)
         self.conv_c = ConvSwishBlock(in_channels=phoneme_dimension,
                                      out_channels=8,
                                      kernel_size=kernel_size)
+        self.mlp_c = LinearSwish(in_features=10,
+                                 out_features=dim_c)
+        self.linear_c = nn.Linear(in_features=phoneme_dimension * dim_c,
+                                  out_features=phoneme_dimension)
         self.max_frame_length = max_frame_length
 
     def get_matrics_and_masks(self,
@@ -102,18 +115,31 @@ class LearnableUpsampler(nn.Module):
         phoneme_mask: tensor (B, 1, L_phone)
         """
         (start_matrix, end_matrix,
-         attn_mask, frame_mask,
-         phoneme_mask) = self.prepare_matrix_and_mask(durations, phoneme, phoneme_mask)
-        phoneme = phoneme.transpose(1, 2)  # (B, L_phone, phoneme_dimension)
-        self.conv_w(self.proj_w(phoneme).transpose(1, 2), phoneme_mask)
+         attn_mask, frame_mask_,
+         phoneme_mask_) = self.prepare_matrix_and_mask(durations, phoneme, phoneme_mask)
+        # Compute W matrix
+        h_w = self.conv_w(self.proj_w(phoneme), phoneme_mask)  # (B, 8, L_phone)
+        w_matrix = self.mlp_w(start_matrix, end_matrix, h_w)
+        w_matrix = w_matrix.masked_fill(phoneme_mask_.unsqueeze(-1), -np.inf)
+        w_matrix = torch.softmax(w_matrix, dim=2)
+        w_matrix = w_matrix.masked_fill(frame_mask_.unsqueeze(-1), 0)
+        # Compute C matrix
+        h_c = self.conv_c(self.proj_c(phoneme), phoneme_mask)
+        c_matrix = self.mlp_c(start_matrix, end_matrix, h_c)
+        # Compute frame-level hidden sequence
+        w_matrix = w_matrix.permute(0, 3, 1, 2)  # (B, 4, L_frame, L_phone)
+        wh = torch.einsum("bqmn, bnh -> bqmh", w_matrix, phoneme.transpose(1, 2))
+        wh = wh.permute(0, 2, 1, 3)
+        wh = torch.flatten(wh, start_dim=2)  # batch, L_frame, 4 * phoneme_dimension
+        wh = self.linear_w(wh)  # batch, L_frame, phoneme_dimension
+        wc = torch.einsum("bqmn, bmnp -> bqmp", w_matrix, c_matrix)
+        wc = wc.permute(0, 2, 1, 3).flatten(2)
+        wc = self.linear_c(wc)  # batch, L_frame, phoneme_dimension
+        whc = wh + wc
         
 
 
 
-if __name__ == '__main__':
-    import torch
-    x = torch.rand(3, 10, 5)
-    predictor = DurationPredictor(10, 0.1)
-    d = predictor(x, torch.rand(3, 1, 5))
-    print(d.size())
-    print(d)
+
+
+

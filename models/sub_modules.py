@@ -1,5 +1,6 @@
 from torch import nn
 from normalizations import LayerNorm
+import torch
 
 
 class ConvReluNormBlock(nn.Module):
@@ -40,3 +41,36 @@ class ConvSwishBlock(nn.Module):
         x = self.swish(x)
         x = self.layer_norm(x)
         return x
+
+
+class LinearSwish(nn.Module):
+    def __init__(self,
+                 in_features: int,
+                 out_features: int,
+                 ) -> None:
+        super().__init__()
+        self.linear1 = nn.Linear(in_features=in_features,
+                                 out_features=out_features)
+        self.swish = nn.SiLU()
+        self.linear2 = nn.Linear(in_features=out_features,
+                                 out_features=out_features)
+
+    def forward(self,
+                start_matrix: torch.Tensor,
+                end_matrix: torch.Tensor,
+                h_w: torch.Tensor):
+        """
+        start_matrix: tensor (B, L_frame, L_phone)
+        end_matrix: tensor (B, L_frame, L_phone)
+        h_w: tensor (B, 8, L_phone)
+        """
+        w_matrix = torch.cat([start_matrix.unsqueeze(-1),
+                              end_matrix.unsqueeze(-1),
+                              h_w.transpose(1, 2)
+                              .unsqueeze(1)
+                              .expand(-1, start_matrix.size(1), -1, -1)], dim=-1)
+        # (B, L_frame, L_phone, 10)
+        w_matrix = self.linear1(w_matrix)
+        w_matrix = self.swish(w_matrix)
+        w_matrix = self.linear2(w_matrix)
+        return w_matrix
