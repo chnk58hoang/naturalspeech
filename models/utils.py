@@ -17,6 +17,6 @@ def get_sequence_mask(x_lengths: torch.Tensor,
 
 if __name__ == "__main__":
     x_lengths = torch.tensor([3, 4, 5])
-    mask = get_sequence_mask(x_lengths, max_length=4)
+    mask = get_sequence_mask(x_lengths, max_length=5)
     print(mask)
     print(mask.size())

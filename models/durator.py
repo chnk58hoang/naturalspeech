@@ -43,6 +43,7 @@ class LearnableUpsampler(nn.Module):
                  dim_c: int = 2,
                  max_frame_length: int = 1000) -> None:
         super().__init__()
+        self.phone_dim = phoneme_dimension
         self.proj_w = nn.Conv1d(in_channels=phoneme_dimension,
                                 out_channels=phoneme_dimension,
                                 kernel_size=1)
@@ -63,6 +64,8 @@ class LearnableUpsampler(nn.Module):
                                  out_features=dim_c)
         self.linear_c = nn.Linear(in_features=phoneme_dimension * dim_c,
                                   out_features=phoneme_dimension)
+        self.proj_o = nn.Linear(in_features=phoneme_dimension,
+                                out_features=phoneme_dimension * 2)
         self.max_frame_length = max_frame_length
 
     def get_matrics_and_masks(self,
@@ -80,15 +83,15 @@ class LearnableUpsampler(nn.Module):
         max_frame_length = frame_lengths.max().item()
         # prepare frame mask, phoneme_mask
         frame_mask = get_sequence_mask(frame_lengths, self.max_frame_length)
-        frame_mask_ = (frame_mask.unsqueeze(-1)
-                       .expand(-1, -1, phone_length)
-                       .to(phoneme.device))  # (batch, max_frame_length, phone_length)
-        phoneme_mask_ = (phoneme_mask.expand(-1, max_frame_length, -1)
-                         .to(phoneme.device))  # (batch, max_frame_length, phone_length)
+        exp_frame_mask = (frame_mask.unsqueeze(-1)
+                          .expand(-1, -1, phone_length)
+                          .to(phoneme.device))  # (batch, max_frame_length, phone_length)
+        exp_phoneme_mask = (phoneme_mask.expand(-1, max_frame_length, -1)
+                            .to(phoneme.device))  # (batch, max_frame_length, phone_length)
         # get matrix attention mask
         attn_mask = torch.zeros(batch, max_frame_length, phone_length).to(phoneme.device)  # (batch, max_frame_length, phone_length)
-        attn_mask = attn_mask.masked_fill(frame_mask_, 1.0)
-        attn_mask = attn_mask.masked_fill(phoneme_mask_, 1.0)
+        attn_mask = attn_mask.masked_fill(exp_frame_mask, 1.0)
+        attn_mask = attn_mask.masked_fill(exp_phoneme_mask, 1.0)
         # Compute start and end duration matrices
         sum_duration = torch.cumsum(durations, dim=-1)
         sk = (sum_duration - durations).unsqueeze(1)
@@ -102,7 +105,8 @@ class LearnableUpsampler(nn.Module):
         start_matrix = start_matrix.masked_fill(~attn_mask, 0)
         end_matrix = end_matrix.masked_fill(~attn_mask, 0)
 
-        return start_matrix, end_matrix, attn_mask, frame_mask_, phoneme_mask_
+        return (start_matrix, end_matrix, frame_lengths, frame_mask,
+                exp_frame_mask, exp_phoneme_mask)
 
     def forward(self,
                 durations: torch.Tensor,
@@ -115,14 +119,14 @@ class LearnableUpsampler(nn.Module):
         phoneme_mask: tensor (B, 1, L_phone)
         """
         (start_matrix, end_matrix,
-         attn_mask, frame_mask_,
-         phoneme_mask_) = self.prepare_matrix_and_mask(durations, phoneme, phoneme_mask)
+         frame_lengths, frame_mask,
+         exp_frame_mask, exp_phoneme_mask) = self.get_matrics_and_masks(durations, phoneme, phoneme_mask)
         # Compute W matrix
         h_w = self.conv_w(self.proj_w(phoneme), phoneme_mask)  # (B, 8, L_phone)
         w_matrix = self.mlp_w(start_matrix, end_matrix, h_w)
-        w_matrix = w_matrix.masked_fill(phoneme_mask_.unsqueeze(-1), -np.inf)
+        w_matrix = w_matrix.masked_fill(~exp_phoneme_mask.unsqueeze(-1), -np.inf)
         w_matrix = torch.softmax(w_matrix, dim=2)
-        w_matrix = w_matrix.masked_fill(frame_mask_.unsqueeze(-1), 0)
+        w_matrix = w_matrix.masked_fill(~exp_frame_mask.unsqueeze(-1), 0)
         # Compute C matrix
         h_c = self.conv_c(self.proj_c(phoneme), phoneme_mask)
         c_matrix = self.mlp_c(start_matrix, end_matrix, h_c)
@@ -135,11 +139,8 @@ class LearnableUpsampler(nn.Module):
         wc = torch.einsum("bqmn, bmnp -> bqmp", w_matrix, c_matrix)
         wc = wc.permute(0, 2, 1, 3).flatten(2)
         wc = self.linear_c(wc)  # batch, L_frame, phoneme_dimension
-        whc = wh + wc
-        
-
-
-
-
-
-
+        whc = wh + wc  # batch, L_frame, phoneme_dimension
+        whc = whc.masked_fill(~frame_mask.unsqueeze(-1), 0)
+        upsample_rep = self.proj_o(whc)  # batch, L_frame, 2 * phoneme_dimension
+        mean, log_std = torch.split(upsample_rep.transpose(1, 2), self.phone_dim, dim=1)
+        return upsample_rep, mean, log_std, frame_mask, frame_lengths, w_matrix

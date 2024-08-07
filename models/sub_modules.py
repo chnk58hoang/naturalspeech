@@ -58,7 +58,7 @@ class LinearSwish(nn.Module):
     def forward(self,
                 start_matrix: torch.Tensor,
                 end_matrix: torch.Tensor,
-                h_w: torch.Tensor):
+                h_w: torch.Tensor) -> torch.Tensor:
         """
         start_matrix: tensor (B, L_frame, L_phone)
         end_matrix: tensor (B, L_frame, L_phone)
