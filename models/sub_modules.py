@@ -74,3 +74,5 @@ class LinearSwish(nn.Module):
         w_matrix = self.swish(w_matrix)
         w_matrix = self.linear2(w_matrix)
         return w_matrix
+
+
