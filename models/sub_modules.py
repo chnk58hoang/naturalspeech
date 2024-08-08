@@ -1,5 +1,6 @@
 from torch import nn
 from normalizations import LayerNorm
+from typing import List
 import torch
 
 
@@ -76,3 +77,62 @@ class LinearSwish(nn.Module):
         return w_matrix
 
 
+class ResBlock(nn.Module):
+    def __init__(self,
+                 kernel_size: List,
+                 dilation_rates: List[List[int]],
+                 channel: int,
+                 slope: float = 0.1) -> None:
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.dilation_rates = dilation_rates
+        self.leaky_relu = nn.LeakyReLU(slope)
+        self.conv_list = nn.ModuleList()
+        for i in range(len(dilation_rates)):
+            for j in range(len(dilation_rates[i])):
+                conv = nn.Conv1d(in_channels=channel,
+                                 out_channels=channel,
+                                 kernel_size=kernel_size,
+                                 stride=1,
+                                 dilation=dilation_rates[i][j],
+                                 padding=(kernel_size - 1) * dilation_rates[i][j] // 2)
+                self.conv_list.append(conv)
+
+    def forward(self, x, x_mask):
+        """
+        x: tensor (B, C, T)
+        x_mask: tensor (B, 1, T)
+        """
+        for i in range(len(self.conv_list)):
+            x_res = self.leaky_relu(x)
+            x_res = self.conv_list[i](x_res) * x_mask
+            x = x + x_res
+        return x * x_mask
+
+
+class MRF(nn.Module):
+    def __init__(self,
+                 kernel_sizes: List[int],
+                 dilation_rates: List[List[List[int]]],):
+        """
+        kernel_sizes: List[int], size: n
+        dilation_rates: List[List[List[int]]], size: n x n x 2
+        """
+        super().__init__()
+        self.kernel_sizes = kernel_sizes
+        self.dilation_rates = dilation_rates
+        self.res_block_list = nn.ModuleList()
+        for i in range(len(kernel_sizes)):
+            res_block = ResBlock(kernel_size=kernel_sizes[i],
+                                 dilation_rates=dilation_rates[i])
+            self.res_block_list.append(res_block)
+
+    def forward(self, x, x_mask):
+        """
+        x: tensor (B, C, T)
+        x_mask: tensor (B, 1, T)
+        """
+        res = torch.zeros_like(x)
+        for i in range(len(self.res_block_list)):
+            res += self.res_block_list[i](x, x_mask)
+        return res
