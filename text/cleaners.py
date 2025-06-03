@@ -16,7 +16,6 @@ import re
 from unidecode import unidecode
 from phonemizer import phonemize
 
-
 # Regular expression matching whitespace:
 _whitespace_re = re.compile(r"\s+")
 

@@ -87,13 +87,13 @@ def get_zs(net_g, dataloader, num_samples=0):
     zs = []
     with torch.no_grad():
         for batch_idx, (
-            x,
-            x_lengths,
-            spec,
-            spec_lengths,
-            y,
-            y_lengths,
-            duration,
+                x,
+                x_lengths,
+                spec,
+                spec_lengths,
+                y,
+                y_lengths,
+                duration,
         ) in enumerate(dataloader):
             rank = 0
             x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(

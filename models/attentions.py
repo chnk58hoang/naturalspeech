@@ -10,15 +10,15 @@ from models.modules import LayerNorm
 
 class Encoder(nn.Module):
     def __init__(
-        self,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size=1,
-        p_dropout=0.0,
-        window_size=4,
-        **kwargs
+            self,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size=1,
+            p_dropout=0.0,
+            window_size=4,
+            **kwargs
     ):
         super().__init__()
         self.hidden_channels = hidden_channels
@@ -73,16 +73,16 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size=1,
-        p_dropout=0.0,
-        proximal_bias=False,
-        proximal_init=True,
-        **kwargs
+            self,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size=1,
+            p_dropout=0.0,
+            proximal_bias=False,
+            proximal_init=True,
+            **kwargs
     ):
         super().__init__()
         self.hidden_channels = hidden_channels
@@ -159,16 +159,16 @@ class Decoder(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     def __init__(
-        self,
-        channels,
-        out_channels,
-        n_heads,
-        p_dropout=0.0,
-        window_size=None,
-        heads_share=True,
-        block_length=None,
-        proximal_bias=False,
-        proximal_init=False,
+            self,
+            channels,
+            out_channels,
+            n_heads,
+            p_dropout=0.0,
+            window_size=None,
+            heads_share=True,
+            block_length=None,
+            proximal_bias=False,
+            proximal_init=False,
     ):
         super().__init__()
         assert channels % n_heads == 0
@@ -193,7 +193,7 @@ class MultiHeadAttention(nn.Module):
 
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
-            rel_stddev = self.k_channels**-0.5
+            rel_stddev = self.k_channels ** -0.5
             self.emb_rel_k = nn.Parameter(
                 torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
                 * rel_stddev
@@ -231,7 +231,7 @@ class MultiHeadAttention(nn.Module):
         scores = torch.matmul(query / math.sqrt(self.k_channels), key.transpose(-2, -1))
         if self.window_size is not None:
             assert (
-                t_s == t_t
+                    t_s == t_t
             ), "Relative attention is only available for self-attention."
             key_relative_embeddings = self._get_relative_embeddings(self.emb_rel_k, t_s)
             rel_logits = self._matmul_with_relative_keys(
@@ -248,7 +248,7 @@ class MultiHeadAttention(nn.Module):
             scores = scores.masked_fill(mask == 0, -1e4)
             if self.block_length is not None:
                 assert (
-                    t_s == t_t
+                        t_s == t_t
                 ), "Local attention is only available for self-attention."
                 block_mask = (
                     torch.ones_like(scores)
@@ -304,8 +304,8 @@ class MultiHeadAttention(nn.Module):
         else:
             padded_relative_embeddings = relative_embeddings
         used_relative_embeddings = padded_relative_embeddings[
-            :, slice_start_position:slice_end_position
-        ]
+                                   :, slice_start_position:slice_end_position
+                                   ]
         return used_relative_embeddings
 
     def _relative_position_to_absolute_position(self, x):
@@ -325,8 +325,8 @@ class MultiHeadAttention(nn.Module):
 
         # Reshape and slice out the padded elements.
         x_final = x_flat.view([batch, heads, length + 1, 2 * length - 1])[
-            :, :, :length, length - 1 :
-        ]
+                  :, :, :length, length - 1:
+                  ]
         return x_final
 
     def _absolute_position_to_relative_position(self, x):
@@ -339,7 +339,7 @@ class MultiHeadAttention(nn.Module):
         x = F.pad(
             x, commons.convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
         )
-        x_flat = x.view([batch, heads, length**2 + length * (length - 1)])
+        x_flat = x.view([batch, heads, length ** 2 + length * (length - 1)])
         # add 0's in the beginning that will skew the elements after reshape
         x_flat = F.pad(x_flat, commons.convert_pad_shape([[0, 0], [0, 0], [length, 0]]))
         x_final = x_flat.view([batch, heads, length, 2 * length])[:, :, :, 1:]
@@ -359,14 +359,14 @@ class MultiHeadAttention(nn.Module):
 
 class FFN(nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        filter_channels,
-        kernel_size,
-        p_dropout=0.0,
-        activation=None,
-        causal=False,
+            self,
+            in_channels,
+            out_channels,
+            filter_channels,
+            kernel_size,
+            p_dropout=0.0,
+            activation=None,
+            causal=False,
     ):
         super().__init__()
         self.in_channels = in_channels

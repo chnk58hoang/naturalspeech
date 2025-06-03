@@ -29,6 +29,7 @@ from torch.autograd import Function
 from numba import cuda
 import math
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #
 # The following is the CPU implementation based on https://github.com/Sleepwalking/pytorch-softdtw
@@ -85,7 +86,7 @@ def compute_softdtw_cuda(D, gamma, bandwidth, max_i, max_j, n_passes, R):
 # ----------------------------------------------------------------------------------------------------------------------
 @cuda.jit
 def compute_softdtw_backward_cuda(
-    D, R, inv_gamma, bandwidth, max_i, max_j, n_passes, E
+        D, R, inv_gamma, bandwidth, max_i, max_j, n_passes, E
 ):
     k = cuda.blockIdx.x
     tid = cuda.threadIdx.x
@@ -118,7 +119,7 @@ def compute_softdtw_backward_cuda(
                     (R[k, i + 1, j + 1] - R[k, i, j] - D[k, i + 1, j + 1]) * inv_gamma
                 )
                 E[k, i, j] = (
-                    E[k, i + 1, j] * a + E[k, i, j + 1] * b + E[k, i + 1, j + 1] * c
+                        E[k, i + 1, j] * a + E[k, i, j + 1] * b + E[k, i + 1, j + 1] * c
                 )
 
         # Wait for other threads in this block
@@ -146,7 +147,7 @@ class _SoftDTWCUDA(Function):
         n_passes = 2 * threads_per_block - 1
 
         D_ = torch.full((B, N + 2, M + 2), np.inf, dtype=dtype, device=dev)
-        D_[:, 1 : N + 1, 1 : M + 1] = D
+        D_[:, 1: N + 1, 1: M + 1] = D
 
         # Prepare the output array
         R = torch.ones((B, N + 2, M + 2), device=dev, dtype=dtype) * math.inf
@@ -180,7 +181,7 @@ class _SoftDTWCUDA(Function):
         n_passes = 2 * threads_per_block - 1
 
         D_ = torch.zeros((B, N + 2, M + 2), dtype=dtype, device=dev)
-        D_[:, 1 : N + 1, 1 : M + 1] = D
+        D_[:, 1: N + 1, 1: M + 1] = D
 
         R[:, :, -1] = -math.inf
         R[:, -1, :] = -math.inf
@@ -200,7 +201,7 @@ class _SoftDTWCUDA(Function):
             n_passes,
             cuda.as_cuda_array(E),
         )
-        E = E[:, 1 : N + 1, 1 : M + 1]
+        E = E[:, 1: N + 1, 1: M + 1]
         return grad_output.view(-1, 1, 1).expand_as(E) * E, None, None, None
 
 
@@ -242,7 +243,7 @@ def compute_softdtw_backward(D_, R, gamma, bandwidth, warp):
     M = D_.shape[2]
     D = np.zeros((B, N + 2, M + 2))
     E = np.zeros((B, N + 2, M + 2))
-    D[:, 1 : N + 1, 1 : M + 1] = D_
+    D[:, 1: N + 1, 1: M + 1] = D_
     E[:, -1, -1] = 1
     R[:, :, -1] = -np.inf
     R[:, -1, :] = -np.inf
@@ -267,9 +268,9 @@ def compute_softdtw_backward(D_, R, gamma, bandwidth, warp):
                 b = np.exp(b0)
                 c = np.exp(c0)
                 E[k, i, j] = (
-                    E[k, i + 1, j] * a + E[k, i, j + 1] * b + E[k, i + 1, j + 1] * c
+                        E[k, i + 1, j] * a + E[k, i, j + 1] * b + E[k, i + 1, j + 1] * c
                 )
-    return E[:, 1 : N + 1, 1 : M + 1]
+    return E[:, 1: N + 1, 1: M + 1]
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -320,7 +321,7 @@ class SoftDTW(torch.nn.Module):
     """
 
     def __init__(
-        self, gamma=1.0, use_cuda=True, normalize=False, bandwidth=None, warp=0.07
+            self, gamma=1.0, use_cuda=True, normalize=False, bandwidth=None, warp=0.07
     ):
         """
         Initializes a new instance using the supplied parameters
@@ -421,7 +422,7 @@ def profile(batch_size, seq_len_a, seq_len_b, dims, tol_backward):
         assert torch.allclose(backward_cpu, backward_gpu.cpu(), atol=tol_backward)
 
         if (
-            i > 0
+                i > 0
         ):  # Ignore the first time we run, in case this is a cold start (because timings are off at a cold start of the script)
             times_cpu += [t_cpu]
             times_gpu += [t_gpu]

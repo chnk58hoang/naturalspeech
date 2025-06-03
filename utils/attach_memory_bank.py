@@ -15,6 +15,8 @@ from utils import utils
 from utils.data_utils import (
     TextAudioLoaderWithDuration,
     TextAudioCollateWithDuration,
+    TextAudioLoader,
+    TextAudioCollate,
 )
 
 from sklearn.cluster import KMeans

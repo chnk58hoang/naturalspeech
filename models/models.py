@@ -1,4 +1,3 @@
-import copy
 import math
 import numpy as np
 import torch
@@ -6,17 +5,17 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
-
 from utils import commons
 from utils.commons import init_weights, get_padding
 from models import modules
 from models import attentions
 from models.modules import ConvBlock, SwishBlock, LinearNorm
+import monotonic_align
 
 
 class DurationPredictor(nn.Module):
     def __init__(
-        self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0
+            self, in_channels, filter_channels, kernel_size, p_dropout, gin_channels=0
     ):
         super().__init__()
 
@@ -59,15 +58,15 @@ class DurationPredictor(nn.Module):
 
 class TextEncoder(nn.Module):
     def __init__(
-        self,
-        n_vocab,
-        out_channels,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size,
-        p_dropout,
+            self,
+            n_vocab,
+            out_channels,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            p_dropout,
     ):
         super().__init__()
         self.n_vocab = n_vocab
@@ -80,11 +79,12 @@ class TextEncoder(nn.Module):
         self.p_dropout = p_dropout
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
-        nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
+        nn.init.normal_(self.emb.weight, 0.0, hidden_channels ** -0.5)
 
         self.encoder = attentions.Encoder(
             hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout
         )
+        self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
     def forward(self, x, x_lengths):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
@@ -94,20 +94,21 @@ class TextEncoder(nn.Module):
         )
 
         x = self.encoder(x * x_mask, x_mask)
-
-        return x, x_mask
+        stats = self.proj(x) * x_mask  # [b, c*2, t]
+        m, logs = torch.split(stats, self.out_channels, dim=1)
+        return x, m, logs, x_mask
 
 
 class LearnableUpsampling(nn.Module):
     def __init__(
-        self,
-        d_predictor=192,
-        kernel_size=3,
-        dropout=0.0,
-        conv_output_size=8,
-        dim_w=4,
-        dim_c=2,
-        max_seq_len=1000,
+            self,
+            d_predictor=192,
+            kernel_size=3,
+            dropout=0.0,
+            conv_output_size=8,
+            dim_w=4,
+            dim_c=2,
+            max_seq_len=1000,
     ):
         super(LearnableUpsampling, self).__init__()
         self.max_seq_len = max_seq_len
@@ -141,7 +142,6 @@ class LearnableUpsampling(nn.Module):
         self.proj_o = LinearNorm(192, 192 * 2)
 
     def forward(self, duration, V, src_len, src_mask, max_src_len):
-
         batch_size = duration.shape[0]
 
         # Duration Interpretation
@@ -220,14 +220,14 @@ class LearnableUpsampling(nn.Module):
 
 class ResidualCouplingBlock(nn.Module):
     def __init__(
-        self,
-        channels,
-        hidden_channels,
-        kernel_size,
-        dilation_rate,
-        n_layers,
-        n_flows=4,
-        gin_channels=0,
+            self,
+            channels,
+            hidden_channels,
+            kernel_size,
+            dilation_rate,
+            n_layers,
+            n_flows=4,
+            gin_channels=0,
     ):
         super().__init__()
         self.channels = channels
@@ -265,7 +265,7 @@ class ResidualCouplingBlock(nn.Module):
 
 class VAEMemoryBank(nn.Module):
     def __init__(
-        self, bank_size=1000, n_hidden_dims=192, n_attn_heads=2, init_values=None
+            self, bank_size=1000, n_hidden_dims=192, n_attn_heads=2, init_values=None
     ):
         super().__init__()
 
@@ -293,14 +293,14 @@ class VAEMemoryBank(nn.Module):
 
 class PosteriorEncoder(nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        hidden_channels,
-        kernel_size,
-        dilation_rate,
-        n_layers,
-        gin_channels=0,
+            self,
+            in_channels,
+            out_channels,
+            hidden_channels,
+            kernel_size,
+            dilation_rate,
+            n_layers,
+            gin_channels=0,
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -335,15 +335,15 @@ class PosteriorEncoder(nn.Module):
 
 class Generator(torch.nn.Module):
     def __init__(
-        self,
-        initial_channel,
-        resblock,
-        resblock_kernel_sizes,
-        resblock_dilation_sizes,
-        upsample_rates,
-        upsample_initial_channel,
-        upsample_kernel_sizes,
-        gin_channels=0,
+            self,
+            initial_channel,
+            resblock,
+            resblock_kernel_sizes,
+            resblock_dilation_sizes,
+            upsample_rates,
+            upsample_initial_channel,
+            upsample_kernel_sizes,
+            gin_channels=0,
     ):
         super(Generator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
@@ -358,7 +358,7 @@ class Generator(torch.nn.Module):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
-                        upsample_initial_channel // (2**i),
+                        upsample_initial_channel // (2 ** i),
                         upsample_initial_channel // (2 ** (i + 1)),
                         k,
                         u,
@@ -371,7 +371,7 @@ class Generator(torch.nn.Module):
         for i in range(len(self.ups)):
             ch = upsample_initial_channel // (2 ** (i + 1))
             for j, (k, d) in enumerate(
-                zip(resblock_kernel_sizes, resblock_dilation_sizes)
+                    zip(resblock_kernel_sizes, resblock_dilation_sizes)
             ):
                 self.resblocks.append(resblock(ch, k, d))
 
@@ -583,10 +583,10 @@ class SynthesizerTrn(nn.Module):
 
         self.use_memory_bank = False
 
-    def forward(self, x, x_lengths, y, y_lengths, d=None, use_gt_duration=True):
+    def forward(self, x, x_lengths, y, y_lengths, use_gt_duration=True):
 
         # text encoder
-        x, x_mask = self.enc_p(x, x_lengths)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
 
         # prior encoder & flow
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=None)
@@ -595,8 +595,8 @@ class SynthesizerTrn(nn.Module):
         # differentiable durator (duration predictor & loss)
         logw = self.dp(x, x_mask, g=None)
         w = torch.exp(logw) * x_mask
-
-        w_ = d.unsqueeze(1)
+        # compute gt duration
+        w_ = self.forward_mas(z_p, m_p, logs_p, x, x_mask, y_mask)
         logw_ = torch.log(w_ + 1e-6) * x_mask
 
         l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
@@ -659,7 +659,7 @@ class SynthesizerTrn(nn.Module):
 
     def infer(self, x, x_lengths, noise_scale=1, length_scale=1, max_len=None, d=None):
         # infer with only one example
-        x, x_mask = self.enc_p(x, x_lengths)
+        x, _, _, x_mask = self.enc_p(x, x_lengths)
 
         logw = self.dp(x, x_mask, g=None)
         w = torch.exp(logw) * x_mask * length_scale
@@ -692,3 +692,17 @@ class SynthesizerTrn(nn.Module):
 
         self.memory_bank = VAEMemoryBank(**hps_models.memory_bank).to(device)
         self.use_memory_bank = True
+
+    def forward_mas(self, z_p, m_p, logs_p, x, x_mask, y_mask):
+        attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
+        with torch.no_grad():
+            # negative cross-entropy
+            s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t]
+            neg_cent1 = torch.sum(-0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True)  # [b, 1, t_s]
+            neg_cent2 = torch.matmul(-0.5 * (z_p ** 2).transpose(1, 2), s_p_sq_r)  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
+            neg_cent3 = torch.matmul(z_p.transpose(1, 2), (m_p * s_p_sq_r))  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
+            neg_cent4 = torch.sum(-0.5 * (m_p ** 2) * s_p_sq_r, [1], keepdim=True)  # [b, 1, t_s]
+            neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
+            attn = monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1)).unsqueeze(1).detach()
+        gt_dur = attn.sum(2)
+        return gt_dur, attn

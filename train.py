@@ -1,10 +1,5 @@
 import os
-import json
-import argparse
-import itertools
-import math
 import torch
-from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -50,13 +45,13 @@ def main():
     os.environ["MASTER_PORT"] = "63331"
 
     hps = utils.get_hparams()
-    
+
     if hps.warmup and not hps.train.use_gt_duration:
         print("'use_gt_duration' option is automatically set to true in warmup phase.")
         hps.train.use_gt_duration = True
-    
+
     if hps.warmup:
-        print("'c_kl_fwd' is set to 0 during warmup to learn a reasonable prior distribution.")  
+        print("'c_kl_fwd' is set to 0 during warmup to learn a reasonable prior distribution.")
         hps.train.c_kl_fwd = 0
 
     mp.spawn(
@@ -218,16 +213,16 @@ def run(rank, n_gpus, hps):
 
 
 def train(
-    rank,
-    epoch,
-    hps,
-    nets,
-    optims,
-    schedulers,
-    scaler,
-    train_loader,
-    logger,
-    writer=None,
+        rank,
+        epoch,
+        hps,
+        nets,
+        optims,
+        schedulers,
+        scaler,
+        train_loader,
+        logger,
+        writer=None,
 ):
     net_g, net_d = nets
     optim_g, optim_d = optims
@@ -240,13 +235,13 @@ def train(
     net_d.train()
 
     for batch_idx, (
-        x,
-        x_lengths,
-        spec,
-        spec_lengths,
-        y,
-        y_lengths,
-        duration,
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            y,
+            y_lengths,
+            duration,
     ) in enumerate(train_loader):
         x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(
             rank, non_blocking=True
@@ -346,30 +341,30 @@ def train(
             # bwd, fwd loss
             if hps.train.use_sdtw:
                 loss_kl = (
-                    kl_loss_dtw(z_p, logs_q, m_p, logs_p, p_mask, z_mask.squeeze(1))
-                    * hps.train.c_kl
+                        kl_loss_dtw(z_p, logs_q, m_p, logs_p, p_mask, z_mask.squeeze(1))
+                        * hps.train.c_kl
                 )
                 loss_kl_fwd = (
-                    kl_loss_dtw(z_q, logs_p, m_q, logs_q, z_mask.squeeze(1), p_mask)
-                    * hps.train.c_kl_fwd
+                        kl_loss_dtw(z_q, logs_p, m_q, logs_q, z_mask.squeeze(1), p_mask)
+                        * hps.train.c_kl_fwd
                 )
             else:
                 loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
                 loss_kl_fwd = (
-                    kl_loss(z_q, logs_p, m_q, logs_q, p_mask.unsqueeze(1))
-                    * hps.train.c_kl_fwd
+                        kl_loss(z_q, logs_p, m_q, logs_q, p_mask.unsqueeze(1))
+                        * hps.train.c_kl_fwd
                 )
 
             loss_dur = torch.sum(l_length.float()) * hps.train.c_dur
 
             loss_gen_all = (
-                loss_gen
-                + loss_gen_e2e
-                + loss_fm
-                + loss_mel
-                + loss_dur
-                + loss_kl
-                + loss_kl_fwd
+                    loss_gen
+                    + loss_gen_e2e
+                    + loss_fm
+                    + loss_mel
+                    + loss_dur
+                    + loss_kl
+                    + loss_kl_fwd
             )
 
         optim_g.zero_grad()
@@ -465,13 +460,13 @@ def evaluate(hps, generator, eval_loader, writer_eval, epoch=0):
 
     with torch.no_grad():
         for batch_idx, (
-            x,
-            x_lengths,
-            spec,
-            spec_lengths,
-            y,
-            y_lengths,
-            duration,
+                x,
+                x_lengths,
+                spec,
+                spec_lengths,
+                y,
+                y_lengths,
+                duration,
         ) in enumerate(eval_loader):
             x, x_lengths = x.cuda(0), x_lengths.cuda(0)
             spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)

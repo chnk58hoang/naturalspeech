@@ -3,3 +3,5 @@ __pycache__
 logs
 DUMMY1
 nohup.out
+.history
+.idea

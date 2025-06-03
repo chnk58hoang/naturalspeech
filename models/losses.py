@@ -24,7 +24,7 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
         dr = dr.float()
         dg = dg.float()
         r_loss = torch.mean((1 - dr) ** 2)
-        g_loss = torch.mean(dg**2)
+        g_loss = torch.mean(dg ** 2)
         loss += r_loss + g_loss
         r_losses.append(r_loss.item())
         g_losses.append(g_loss.item())
@@ -99,9 +99,9 @@ def get_sdtw_kl_matrix(z_p, logs_q, m_p, logs_p):
 
     kl = logs_p[:, :, :, None] - logs_q[:, :, None, :] - 0.5  # p, q
     kl += (
-        0.5
-        * ((z_p[:, :, None, :] - m_p[:, :, :, None]) ** 2)
-        * torch.exp(-2.0 * logs_p[:, :, :, None])
+            0.5
+            * ((z_p[:, :, None, :] - m_p[:, :, :, None]) ** 2)
+            * torch.exp(-2.0 * logs_p[:, :, :, None])
     )
 
     kl = kl.sum(dim=1)

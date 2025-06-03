@@ -217,13 +217,13 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for batch_idx, (
-                x,
-                x_lengths,
-                spec,
-                spec_lengths,
-                y,
-                y_lengths,
-                paths,
+                    x,
+                    x_lengths,
+                    spec,
+                    spec_lengths,
+                    y,
+                    y_lengths,
+                    paths,
             ) in enumerate(dataloader):
                 x, x_lengths = x.cuda(0), x_lengths.cuda(0)
                 spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)
