@@ -1,30 +1,19 @@
 import argparse
-import text
-from utils import load_filepaths_and_text
-
-# from data_utils import (
-#   TextAudioLoader,
-# )
 from text.symbols import symbols
-from models import (
+from models.models import (
     SynthesizerTrn,
 )
 import utils
 from torch.utils.data import DataLoader
 import torch
-
 import os
 import random
 import numpy as np
-import torch
 import torch.utils.data
-
-import commons
-from mel_processing import spectrogram_torch
-from utils import load_wav_to_torch, load_filepaths_and_text
+from utils import commons
+from utils.mel_processing import spectrogram_torch
+from utils.utils import load_wav_to_torch, load_filepaths_and_text
 from text import text_to_sequence, cleaned_text_to_sequence
-
-import json
 
 
 class TextAudioLoaderWithPath(torch.utils.data.Dataset):

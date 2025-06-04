@@ -15,6 +15,8 @@ from utils.data_utils import (
     TextAudioLoaderWithDuration,
     TextAudioCollateWithDuration,
     DistributedBucketSampler,
+    TextAudioLoader,
+    TextAudioCollate,
 )
 from models.models import (
     SynthesizerTrn,
@@ -79,7 +81,9 @@ def run(rank, n_gpus, hps):
     torch.manual_seed(hps.train.seed)
     torch.cuda.set_device(rank)
 
-    train_dataset = TextAudioLoaderWithDuration(hps.data.training_files, hps.data)
+    train_dataset = TextAudioLoader(hps.data.training_files, hps.data,
+                                    data_dir=hps.data.data_dir,
+                                    type="train")
     train_sampler = DistributedBucketSampler(
         train_dataset,
         hps.train.batch_size,
@@ -88,7 +92,7 @@ def run(rank, n_gpus, hps):
         rank=rank,
         shuffle=True,
     )
-    collate_fn = TextAudioCollateWithDuration()
+    collate_fn = TextAudioCollate()
     train_loader = DataLoader(
         train_dataset,
         num_workers=8,
@@ -98,7 +102,9 @@ def run(rank, n_gpus, hps):
         batch_sampler=train_sampler,
     )
     if rank == 0:
-        eval_dataset = TextAudioLoaderWithDuration(hps.data.validation_files, hps.data)
+        eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data,
+                                       data_dir=hps.data.data_dir,
+                                       type="eval")
         eval_loader = DataLoader(
             eval_dataset,
             num_workers=8,
@@ -241,7 +247,6 @@ def train(
             spec_lengths,
             y,
             y_lengths,
-            duration,
     ) in enumerate(train_loader):
         x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(
             rank, non_blocking=True
@@ -252,7 +257,6 @@ def train(
         y, y_lengths = y.cuda(rank, non_blocking=True), y_lengths.cuda(
             rank, non_blocking=True
         )
-        duration = duration.cuda(rank, non_blocking=True)
 
         with autocast(enabled=hps.train.fp16_run):
             (
@@ -272,7 +276,6 @@ def train(
                 x_lengths,
                 spec,
                 spec_lengths,
-                d=duration,
                 use_gt_duration=hps.train.use_gt_duration,
             )
             y1 = commons.slice_segments(
@@ -465,8 +468,7 @@ def evaluate(hps, generator, eval_loader, writer_eval, epoch=0):
                 spec,
                 spec_lengths,
                 y,
-                y_lengths,
-                duration,
+                y_lengths
         ) in enumerate(eval_loader):
             x, x_lengths = x.cuda(0), x_lengths.cuda(0)
             spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)

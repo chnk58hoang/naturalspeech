@@ -588,7 +588,7 @@ class SynthesizerTrn(nn.Module):
         # text encoder
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
 
-        # prior encoder & flow
+        # posterior encoder & flow
         z, m_q, logs_q, y_mask = self.enc_q(y, y_lengths, g=None)
         z_p = self.flow(z, y_mask, g=None)
 
@@ -596,15 +596,15 @@ class SynthesizerTrn(nn.Module):
         logw = self.dp(x, x_mask, g=None)
         w = torch.exp(logw) * x_mask
         # compute gt duration
-        w_ = self.forward_mas(z_p, m_p, logs_p, x, x_mask, y_mask)
+        w_, _ = self.forward_mas(z_p, m_p, logs_p, x, x_mask, y_mask)
         logw_ = torch.log(w_ + 1e-6) * x_mask
-
-        l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(
-            x_mask
-        )  # for averaging
+        # duration loss
+        l_length = torch.sum((logw - logw_) ** 2, [1, 2]) / torch.sum(x_mask)  # for averaging
 
         if not use_gt_duration:
             d = w.squeeze(1)  # use predicted duration
+        else:
+            d = w_.squeeze(1)
 
         # differentiable durator (learnable upsampling)
         upsampled_rep, p_mask, _, W = self.learnable_upsampling(
@@ -694,15 +694,18 @@ class SynthesizerTrn(nn.Module):
         self.use_memory_bank = True
 
     def forward_mas(self, z_p, m_p, logs_p, x, x_mask, y_mask):
+        # z_p: [b, d, t_s]
+        # m_p: [b, d, t_t]
+        # logs_p: [b, d, t_t]
         attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
         with torch.no_grad():
             # negative cross-entropy
-            s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t]
-            neg_cent1 = torch.sum(-0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True)  # [b, 1, t_s]
-            neg_cent2 = torch.matmul(-0.5 * (z_p ** 2).transpose(1, 2), s_p_sq_r)  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-            neg_cent3 = torch.matmul(z_p.transpose(1, 2), (m_p * s_p_sq_r))  # [b, t_t, d] x [b, d, t_s] = [b, t_t, t_s]
-            neg_cent4 = torch.sum(-0.5 * (m_p ** 2) * s_p_sq_r, [1], keepdim=True)  # [b, 1, t_s]
-            neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4
-            attn = monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1)).unsqueeze(1).detach()
-        gt_dur = attn.sum(2)
+            s_p_sq_r = torch.exp(-2 * logs_p)  # [b, d, t_t]
+            neg_cent1 = torch.sum(-0.5 * math.log(2 * math.pi) - logs_p, [1], keepdim=True)  # [b, 1, t_t]
+            neg_cent2 = torch.matmul(-0.5 * (z_p ** 2).transpose(1, 2), s_p_sq_r)  # [b, t_s, d] x [b, d, t_t] = [b, t_s, t_t]
+            neg_cent3 = torch.matmul(z_p.transpose(1, 2), (m_p * s_p_sq_r))  # [b, t_s, d] x [b, d, t_t] = [b, t_s, t_t]
+            neg_cent4 = torch.sum(-0.5 * (m_p ** 2) * s_p_sq_r, [1], keepdim=True)  # [b, 1, t_t]
+            neg_cent = neg_cent1 + neg_cent2 + neg_cent3 + neg_cent4  # [b, t_s, t_t]
+            attn = monotonic_align.maximum_path(neg_cent, attn_mask.squeeze(1)).unsqueeze(1).detach()  # [b, 1, t_s, t_t]
+        gt_dur = attn.sum(2)  # [b, 1, t_t]
         return gt_dur, attn

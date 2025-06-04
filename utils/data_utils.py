@@ -1,4 +1,3 @@
-import time
 import os
 import random
 import numpy as np
@@ -8,9 +7,7 @@ import torch.utils.data
 from utils import commons
 from utils.mel_processing import spectrogram_torch
 from utils.utils import load_wav_to_torch, load_filepaths_and_text
-from text import text_to_sequence, cleaned_text_to_sequence
-
-import json
+from text import text_to_sequence, cleaned_text_to_sequence, vie_text_to_sequence
 
 
 class TextAudioLoader(torch.utils.data.Dataset):
@@ -20,8 +17,12 @@ class TextAudioLoader(torch.utils.data.Dataset):
     3) computes spectrograms from audio files.
     """
 
-    def __init__(self, audiopaths_and_text, hparams):
-        self.audiopaths_and_text = load_filepaths_and_text(audiopaths_and_text)
+    def __init__(self, audiopaths_and_text, hparams, data_dir, type="train"):
+        audiopaths_and_text_list = load_filepaths_and_text(audiopaths_and_text)
+        if type == "train":
+            self.audiopaths_and_text = audiopaths_and_text_list[: 0.9*len(audiopaths_and_text_list)]
+        else:
+            self.audiopaths_and_text = audiopaths_and_text_list[0.9*len(audiopaths_and_text_list):]
         self.text_cleaners = hparams.text_cleaners
         self.max_wav_value = hparams.max_wav_value
         self.sampling_rate = hparams.sampling_rate
@@ -29,7 +30,8 @@ class TextAudioLoader(torch.utils.data.Dataset):
         self.hop_length = hparams.hop_length
         self.win_length = hparams.win_length
         self.sampling_rate = hparams.sampling_rate
-
+        self.lang = hparams.lang
+        self.data_dir = data_dir
         self.cleaned_text = getattr(hparams, "cleaned_text", False)
 
         self.add_blank = hparams.add_blank
@@ -60,6 +62,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
     def get_audio_text_pair(self, audiopath_and_text):
         # separate filename and text
         audiopath, text = audiopath_and_text[0], audiopath_and_text[1]
+        audiopath = os.path.join(self.data_dir, audiopath)
         text = self.get_text(text)
         spec, wav = self.get_audio(audiopath)
         return (text, spec, wav)
@@ -94,7 +97,10 @@ class TextAudioLoader(torch.utils.data.Dataset):
         if self.cleaned_text:
             text_norm = cleaned_text_to_sequence(text)
         else:
-            text_norm = text_to_sequence(text, self.text_cleaners)
+            if self.lang == "vi":
+                text_norm = vie_text_to_sequence(text)
+            else:
+                text_norm = text_to_sequence(text, self.text_cleaners)
         if self.add_blank:
             text_norm = commons.intersperse(text_norm, 0)
         text_norm = torch.LongTensor(text_norm)

@@ -1,8 +1,6 @@
 import os
 import argparse
 from pathlib import Path
-
-import numpy as np
 import torch
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
