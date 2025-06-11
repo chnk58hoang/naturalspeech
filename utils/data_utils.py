@@ -37,7 +37,8 @@ class TextAudioLoader(torch.utils.data.Dataset):
         self.add_blank = hparams.add_blank
         self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.max_text_len = getattr(hparams, "max_text_len", 190)
-
+        for item in self.audiopaths_and_text:
+            item[0] = os.path.join(self.data_dir, item[0])
         random.seed(1234)
         random.shuffle(self.audiopaths_and_text)
         self._filter()
@@ -62,7 +63,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
     def get_audio_text_pair(self, audiopath_and_text):
         # separate filename and text
         audiopath, text = audiopath_and_text[0], audiopath_and_text[1]
-        audiopath = os.path.join(self.data_dir, audiopath)
+        # audiopath = os.path.join(self.data_dir, audiopath)
         text = self.get_text(text)
         spec, wav = self.get_audio(audiopath)
         return (text, spec, wav)

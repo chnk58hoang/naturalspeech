@@ -35,7 +35,8 @@
     "mel_fmax": null,
     "add_blank": true,
     "n_speakers": 0,
-    "cleaned_text": false
+    "cleaned_text": false,
+    "lang": "vi",
   },
   "models": {
     "phoneme_encoder": {
