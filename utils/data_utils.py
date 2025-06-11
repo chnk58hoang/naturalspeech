@@ -20,9 +20,9 @@ class TextAudioLoader(torch.utils.data.Dataset):
     def __init__(self, audiopaths_and_text, hparams, data_dir, type="train"):
         audiopaths_and_text_list = load_filepaths_and_text(audiopaths_and_text)
         if type == "train":
-            self.audiopaths_and_text = audiopaths_and_text_list[: 0.9*len(audiopaths_and_text_list)]
+            self.audiopaths_and_text = audiopaths_and_text_list[: int(0.95*len(audiopaths_and_text_list))]
         else:
-            self.audiopaths_and_text = audiopaths_and_text_list[0.9*len(audiopaths_and_text_list):]
+            self.audiopaths_and_text = audiopaths_and_text_list[int(0.95*len(audiopaths_and_text_list)):]
         self.text_cleaners = hparams.text_cleaners
         self.max_wav_value = hparams.max_wav_value
         self.sampling_rate = hparams.sampling_rate

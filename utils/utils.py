@@ -181,7 +181,8 @@ def get_hparams(init=True):
     parser.add_argument(
         "--warmup", action="store_true", help="Whether to train as warmup phase"
     )
-
+    parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+    parser.add_argument("--type", type=str, default="train", help="Data type (train/val/test)")
     args = parser.parse_args()
     model_dir = os.path.join("./logs", args.model)
 
