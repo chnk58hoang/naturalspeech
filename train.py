@@ -82,8 +82,8 @@ def run(rank, n_gpus, hps):
     torch.cuda.set_device(rank)
 
     train_dataset = TextAudioLoader(hps.data.training_files, hps.data,
-                                    data_dir=hps.data.data_dir,
-                                    type="train")
+                                    data_dir=hps.data_dir,
+                                    type=hps.type)
     train_sampler = DistributedBucketSampler(
         train_dataset,
         hps.train.batch_size,
@@ -103,8 +103,8 @@ def run(rank, n_gpus, hps):
     )
     if rank == 0:
         eval_dataset = TextAudioLoader(hps.data.validation_files, hps.data,
-                                       data_dir=hps.data.data_dir,
-                                       type="eval")
+                                       data_dir=hps.data_dir,
+                                       type=hps.type)
         eval_loader = DataLoader(
             eval_dataset,
             num_workers=8,

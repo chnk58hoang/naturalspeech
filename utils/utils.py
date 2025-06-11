@@ -204,6 +204,8 @@ def get_hparams(init=True):
     hparams = HParams(**config)
     hparams.model_dir = model_dir
     hparams.warmup = args.warmup
+    hparams.data_dir = args.data_dir
+    hparams.type = args.type
 
     return hparams
 
