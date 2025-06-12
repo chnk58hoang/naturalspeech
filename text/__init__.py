@@ -8,7 +8,7 @@ _id_to_symbol = {i: s for i, s in enumerate(symbols)}
 
 vie_symbols_to_id = {s: i for i, s in enumerate(vie_symbols)}
 vie_id_to_symbol = {i: s for i, s in enumerate(vie_symbols)}
-
+# print(vie_symbols)
 
 def text_to_sequence(text, cleaner_names):
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.

@@ -206,7 +206,7 @@ def get_hparams(init=True):
     hparams.warmup = args.warmup
     hparams.data_dir = args.data_dir
     hparams.type = args.type
-    hparams.lang
+    # hparams.lang
     return hparams
 
 

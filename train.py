@@ -58,9 +58,9 @@ def main():
 
     mp.spawn(
         run,
-        nprocs=n_gpus,
+        nprocs=1,
         args=(
-            n_gpus,
+            1,
             hps,
         ),
     )
@@ -151,8 +151,8 @@ def run(rank, n_gpus, hps):
         epoch_str = 0
         global_step = 0
 
-    net_g = DDP(net_g, device_ids=[rank])
-    net_d = DDP(net_d, device_ids=[rank])
+    net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
+    net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
         optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 1

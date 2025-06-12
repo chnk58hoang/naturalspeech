@@ -72,7 +72,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
         audio, sampling_rate = load_wav_to_torch(filename)
         if sampling_rate != self.sampling_rate:
             raise ValueError(
-                "{} {} SR doesn't match target {} SR".format(
+                "{} SR doesn't match target {} SR".format(
                     sampling_rate, self.sampling_rate
                 )
             )
@@ -91,7 +91,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
                 center=False,
             )
             spec = torch.squeeze(spec, 0)
-            torch.save(spec, spec_filename)
+            # torch.save(spec, spec_filename)
         return spec, audio_norm
 
     def get_text(self, text):
@@ -99,6 +99,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
             text_norm = cleaned_text_to_sequence(text)
         else:
             if self.lang == "vi":
+                text = text.lower()
                 text_norm = vie_text_to_sequence(text)
             else:
                 text_norm = text_to_sequence(text, self.text_cleaners)
@@ -126,13 +127,17 @@ class TextAudioCollate:
         ------
         batch: [text_normalized, spec_normalized, wav_normalized]
         """
+        # for x in batch:
+        #    print(x[0].size())
+        #    print(x[1].size())
+        #    print(x[2].size())
         # Right zero-pad all one-hot text sequences to max input length
         _, ids_sorted_decreasing = torch.sort(
-            torch.LongTensor([x[1].size(1) for x in batch]), dim=0, descending=True
+            torch.LongTensor([x[1].size(-1) for x in batch]), dim=0, descending=True
         )
 
         max_text_len = max([len(x[0]) for x in batch])
-        max_spec_len = max([x[1].size(1) for x in batch])
+        max_spec_len = max([x[1].size(-1) for x in batch])
         max_wav_len = max([x[2].size(1) for x in batch])
 
         text_lengths = torch.LongTensor(len(batch))
