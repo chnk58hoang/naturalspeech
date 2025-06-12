@@ -473,54 +473,58 @@ def evaluate(hps, generator, eval_loader, writer_eval, epoch=0):
                 y,
                 y_lengths
         ) in enumerate(eval_loader):
-            x, x_lengths = x.cuda(0), x_lengths.cuda(0)
-            spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)
-            y, y_lengths = y.cuda(0), y_lengths.cuda(0)
-            # remove else
-            x = x[:1]
-            x_lengths = x_lengths[:1]
-            spec = spec[:1]
-            spec_lengths = spec_lengths[:1]
-            y = y[:1]
-            y_lengths = y_lengths[:1]
+            try:
+                x, x_lengths = x.cuda(0), x_lengths.cuda(0)
+                spec, spec_lengths = spec.cuda(0), spec_lengths.cuda(0)
+                y, y_lengths = y.cuda(0), y_lengths.cuda(0)
+                # remove else
+                x = x[:1]
+                x_lengths = x_lengths[:1]
+                spec = spec[:1]
+                spec_lengths = spec_lengths[:1]
+                y = y[:1]
+                y_lengths = y_lengths[:1]
 
-            y_hat, mask, *_ = generator.module.infer(x, x_lengths, max_len=1000)
-            y_hat_lengths = mask.sum([1, 2]).long() * hps.data.hop_length
+                y_hat, mask, *_ = generator.module.infer(x, x_lengths, max_len=1000)
+                y_hat_lengths = mask.sum([1, 2]).long() * hps.data.hop_length
 
-            mel = spec_to_mel_torch(
-                spec,
-                hps.data.filter_length,
-                hps.data.n_mel_channels,
-                hps.data.sampling_rate,
-                hps.data.mel_fmin,
-                hps.data.mel_fmax,
-            )
-            y_hat_mel = mel_spectrogram_torch(
-                y_hat.squeeze(1).float(),
-                hps.data.filter_length,
-                hps.data.n_mel_channels,
-                hps.data.sampling_rate,
-                hps.data.hop_length,
-                hps.data.win_length,
-                hps.data.mel_fmin,
-                hps.data.mel_fmax,
-            )
+                mel = spec_to_mel_torch(
+                    spec,
+                    hps.data.filter_length,
+                    hps.data.n_mel_channels,
+                    hps.data.sampling_rate,
+                    hps.data.mel_fmin,
+                    hps.data.mel_fmax,
+                )
+                y_hat_mel = mel_spectrogram_torch(
+                    y_hat.squeeze(1).float(),
+                    hps.data.filter_length,
+                    hps.data.n_mel_channels,
+                    hps.data.sampling_rate,
+                    hps.data.hop_length,
+                    hps.data.win_length,
+                    hps.data.mel_fmin,
+                    hps.data.mel_fmax,
+                )
 
-            audio = y_hat[0, 0, : y_hat_lengths[0]].cpu().numpy()
-            audio_gt = y[0, 0, : y_lengths[0]].cpu().numpy()
-            scipy.io.wavfile.write(
-                filename=os.path.join(save_dir, f"{batch_idx}.wav"),
-                rate=hps.data.sampling_rate,
-                data=audio,
-            )
-            scipy.io.wavfile.write(
-                filename=os.path.join(save_dir, f"{batch_idx}_gt.wav"),
-                rate=hps.data.sampling_rate,
-                data=audio_gt,
-            )
+                audio = y_hat[0, 0, : y_hat_lengths[0]].cpu().numpy()
+                audio_gt = y[0, 0, : y_lengths[0]].cpu().numpy()
+                scipy.io.wavfile.write(
+                    filename=os.path.join(save_dir, f"{batch_idx}.wav"),
+                    rate=hps.data.sampling_rate,
+                    data=audio,
+                )
+                scipy.io.wavfile.write(
+                    filename=os.path.join(save_dir, f"{batch_idx}_gt.wav"),
+                    rate=hps.data.sampling_rate,
+                    data=audio_gt,
+                )
 
-            if batch_idx >= 8:
-                break
+                if batch_idx >= 8:
+                    break
+            except Exception as e:
+                print(f"Error in batch {batch_idx} during evaluation: {e}. Skipping batch.")
+
 
     image_dict = {
         "gen/mel": utils.plot_spectrogram_to_numpy(y_hat_mel[0].cpu().numpy())
