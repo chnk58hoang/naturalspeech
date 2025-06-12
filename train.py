@@ -248,208 +248,211 @@ def train(
             y,
             y_lengths,
     ) in enumerate(train_loader):
-        x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(
-            rank, non_blocking=True
-        )
-        spec, spec_lengths = spec.cuda(rank, non_blocking=True), spec_lengths.cuda(
-            rank, non_blocking=True
-        )
-        y, y_lengths = y.cuda(rank, non_blocking=True), y_lengths.cuda(
-            rank, non_blocking=True
-        )
-
-        with autocast(enabled=hps.train.fp16_run):
-            (
-                y_hat,
-                l_length,
-                ids_slice,
-                x_mask,
-                z_mask,
-                (z, z_p, m_p, logs_p, m_q, logs_q, p_mask),
-                W,
-                y_hat_e2e,
-                z_q,
-                d,
-                ids_slice_q,
-            ) = net_g(
-                x,
-                x_lengths,
-                spec,
-                spec_lengths,
-                use_gt_duration=hps.train.use_gt_duration,
+        try: 
+            x, x_lengths = x.cuda(rank, non_blocking=True), x_lengths.cuda(
+                rank, non_blocking=True
             )
-            y1 = commons.slice_segments(
-                y, ids_slice * hps.data.hop_length, hps.train.segment_size
+            spec, spec_lengths = spec.cuda(rank, non_blocking=True), spec_lengths.cuda(
+                rank, non_blocking=True
             )
-            y2 = commons.slice_segments(
-                y, ids_slice_q * hps.data.hop_length, hps.train.segment_size
+            y, y_lengths = y.cuda(rank, non_blocking=True), y_lengths.cuda(
+                rank, non_blocking=True
             )
 
-            # Discriminator
-            y_d_hat_r, y_d_hat_g, _, _ = net_d(y1, y_hat.detach())
-            y_d_hat_r_e2e, y_d_hat_g_e2e, _, _ = net_d(y2, y_hat_e2e.detach())
-
-            loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
-                y_d_hat_r, y_d_hat_g
-            )
-
-            loss_disc_e2e, _, _ = discriminator_loss(y_d_hat_r_e2e, y_d_hat_g_e2e)
-            loss_disc_e2e *= hps.train.c_e2e
-
-            loss_disc_all = loss_disc + loss_disc_e2e
-
-        optim_d.zero_grad()
-        scaler.scale(loss_disc_all).backward()
-        scaler.unscale_(optim_d)
-        grad_norm_d = commons.clip_grad_value_(net_d.parameters(), None)
-        scaler.step(optim_d)
-
-        with autocast(enabled=hps.train.fp16_run):
-            # Generator
-            # reconstruction loss (feature mapping, gan loss)
-            y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y1, y_hat)
-
-            # reconstruction loss (mel spectrogram loss)
-            mel = spec_to_mel_torch(
-                spec,
-                hps.data.filter_length,
-                hps.data.n_mel_channels,
-                hps.data.sampling_rate,
-                hps.data.mel_fmin,
-                hps.data.mel_fmax,
-            )
-            y_mel = commons.slice_segments(
-                mel, ids_slice, hps.train.segment_size // hps.data.hop_length
-            )
-            y_hat_mel = mel_spectrogram_torch(
-                y_hat.squeeze(1),
-                hps.data.filter_length,
-                hps.data.n_mel_channels,
-                hps.data.sampling_rate,
-                hps.data.hop_length,
-                hps.data.win_length,
-                hps.data.mel_fmin,
-                hps.data.mel_fmax,
-            )
-
-            loss_fm = feature_loss(fmap_r, fmap_g)
-            loss_gen, losses_gen = generator_loss(y_d_hat_g)
-            loss_mel = F.l1_loss(y_mel, y_hat_mel) * hps.train.c_mel
-
-            # e2e loss
-            y_d_hat_r_e2e, y_d_hat_g_e2e, _, _ = net_d(y2, y_hat_e2e)
-            loss_gen_e2e, losses_gen_e2e = generator_loss(y_d_hat_g_e2e)
-            loss_gen_e2e *= hps.train.c_e2e
-
-            # bwd, fwd loss
-            if hps.train.use_sdtw:
-                loss_kl = (
-                        kl_loss_dtw(z_p, logs_q, m_p, logs_p, p_mask, z_mask.squeeze(1))
-                        * hps.train.c_kl
+            with autocast(enabled=hps.train.fp16_run):
+                (
+                    y_hat,
+                    l_length,
+                    ids_slice,
+                    x_mask,
+                    z_mask,
+                    (z, z_p, m_p, logs_p, m_q, logs_q, p_mask),
+                    W,
+                    y_hat_e2e,
+                    z_q,
+                    d,
+                    ids_slice_q,
+                ) = net_g(
+                    x,
+                    x_lengths,
+                    spec,
+                    spec_lengths,
+                    use_gt_duration=hps.train.use_gt_duration,
                 )
-                loss_kl_fwd = (
-                        kl_loss_dtw(z_q, logs_p, m_q, logs_q, z_mask.squeeze(1), p_mask)
-                        * hps.train.c_kl_fwd
+                y1 = commons.slice_segments(
+                    y, ids_slice * hps.data.hop_length, hps.train.segment_size
                 )
-            else:
-                loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
-                loss_kl_fwd = (
-                        kl_loss(z_q, logs_p, m_q, logs_q, p_mask.unsqueeze(1))
-                        * hps.train.c_kl_fwd
+                y2 = commons.slice_segments(
+                    y, ids_slice_q * hps.data.hop_length, hps.train.segment_size
                 )
 
-            loss_dur = torch.sum(l_length.float()) * hps.train.c_dur
+                # Discriminator
+                y_d_hat_r, y_d_hat_g, _, _ = net_d(y1, y_hat.detach())
+                y_d_hat_r_e2e, y_d_hat_g_e2e, _, _ = net_d(y2, y_hat_e2e.detach())
 
-            loss_gen_all = (
-                    loss_gen
-                    + loss_gen_e2e
-                    + loss_fm
-                    + loss_mel
-                    + loss_dur
-                    + loss_kl
-                    + loss_kl_fwd
-            )
+                loss_disc, losses_disc_r, losses_disc_g = discriminator_loss(
+                    y_d_hat_r, y_d_hat_g
+                )
 
-        optim_g.zero_grad()
-        scaler.scale(loss_gen_all).backward()
-        scaler.unscale_(optim_g)
-        grad_norm_g = commons.clip_grad_value_(net_g.parameters(), None)
-        scaler.step(optim_g)
-        scaler.update()
+                loss_disc_e2e, _, _ = discriminator_loss(y_d_hat_r_e2e, y_d_hat_g_e2e)
+                loss_disc_e2e *= hps.train.c_e2e
 
-        if rank == 0:
-            if global_step % hps.train.log_interval == 0:
-                lr = optim_g.param_groups[0]["lr"]
-                losses = [
-                    loss_disc,
-                    loss_disc_e2e,
-                    loss_gen,
-                    loss_gen_e2e,
-                    loss_fm,
-                    loss_mel,
-                    loss_dur,
-                    loss_kl,
-                    loss_kl_fwd,
-                ]
-                logger.info(
-                    "Train Epoch: {} [{:.0f}%]".format(
-                        epoch, 100.0 * batch_idx / len(train_loader)
+                loss_disc_all = loss_disc + loss_disc_e2e
+
+            optim_d.zero_grad()
+            scaler.scale(loss_disc_all).backward()
+            scaler.unscale_(optim_d)
+            grad_norm_d = commons.clip_grad_value_(net_d.parameters(), None)
+            scaler.step(optim_d)
+
+            with autocast(enabled=hps.train.fp16_run):
+                # Generator
+                # reconstruction loss (feature mapping, gan loss)
+                y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(y1, y_hat)
+
+                # reconstruction loss (mel spectrogram loss)
+                mel = spec_to_mel_torch(
+                    spec,
+                    hps.data.filter_length,
+                    hps.data.n_mel_channels,
+                    hps.data.sampling_rate,
+                    hps.data.mel_fmin,
+                    hps.data.mel_fmax,
+                )
+                y_mel = commons.slice_segments(
+                    mel, ids_slice, hps.train.segment_size // hps.data.hop_length
+                )
+                y_hat_mel = mel_spectrogram_torch(
+                    y_hat.squeeze(1),
+                    hps.data.filter_length,
+                    hps.data.n_mel_channels,
+                    hps.data.sampling_rate,
+                    hps.data.hop_length,
+                    hps.data.win_length,
+                    hps.data.mel_fmin,
+                    hps.data.mel_fmax,
+                )
+
+                loss_fm = feature_loss(fmap_r, fmap_g)
+                loss_gen, losses_gen = generator_loss(y_d_hat_g)
+                loss_mel = F.l1_loss(y_mel, y_hat_mel) * hps.train.c_mel
+
+                # e2e loss
+                y_d_hat_r_e2e, y_d_hat_g_e2e, _, _ = net_d(y2, y_hat_e2e)
+                loss_gen_e2e, losses_gen_e2e = generator_loss(y_d_hat_g_e2e)
+                loss_gen_e2e *= hps.train.c_e2e
+
+                # bwd, fwd loss
+                if hps.train.use_sdtw:
+                    loss_kl = (
+                            kl_loss_dtw(z_p, logs_q, m_p, logs_p, p_mask, z_mask.squeeze(1))
+                            * hps.train.c_kl
                     )
-                )
-                logger.info(
-                    "[loss_disc, loss_disc_e2e, loss_gen, loss_gen_e2e, loss_fm, loss_mel, loss_dur, loss_kl, loss_kl_fwd, global_step, lr]"
-                )
-                logger.info([x.item() for x in losses] + [global_step, lr])
+                    loss_kl_fwd = (
+                            kl_loss_dtw(z_q, logs_p, m_q, logs_q, z_mask.squeeze(1), p_mask)
+                            * hps.train.c_kl_fwd
+                    )
+                else:
+                    loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
+                    loss_kl_fwd = (
+                            kl_loss(z_q, logs_p, m_q, logs_q, p_mask.unsqueeze(1))
+                            * hps.train.c_kl_fwd
+                    )
 
-                scalar_dict = {
-                    "loss/g/total": loss_gen_all,
-                    "loss/d/total": loss_disc_all,
-                    "learning_rate": lr,
-                    "grad_norm_d": grad_norm_d,
-                    "grad_norm_g": grad_norm_g,
-                }
-                scalar_dict.update(
-                    {
-                        "loss/g/fm": loss_fm,
-                        "loss/g/mel": loss_mel,
-                        "loss/g/dur": loss_dur,
-                        "loss/g/kl": loss_kl,
-                        "loss/g/kl_fwd": loss_kl_fwd,
+                loss_dur = torch.sum(l_length.float()) * hps.train.c_dur
+
+                loss_gen_all = (
+                        loss_gen
+                        + loss_gen_e2e
+                        + loss_fm
+                        + loss_mel
+                        + loss_dur
+                        + loss_kl
+                        + loss_kl_fwd
+                )
+
+            optim_g.zero_grad()
+            scaler.scale(loss_gen_all).backward()
+            scaler.unscale_(optim_g)
+            grad_norm_g = commons.clip_grad_value_(net_g.parameters(), None)
+            scaler.step(optim_g)
+            scaler.update()
+
+            if rank == 0:
+                if global_step % hps.train.log_interval == 0:
+                    lr = optim_g.param_groups[0]["lr"]
+                    losses = [
+                        loss_disc,
+                        loss_disc_e2e,
+                        loss_gen,
+                        loss_gen_e2e,
+                        loss_fm,
+                        loss_mel,
+                        loss_dur,
+                        loss_kl,
+                        loss_kl_fwd,
+                    ]
+                    logger.info(
+                        "Train Epoch: {} [{:.0f}%]".format(
+                            epoch, 100.0 * batch_idx / len(train_loader)
+                        )
+                    )
+                    logger.info(
+                        "[loss_disc, loss_disc_e2e, loss_gen, loss_gen_e2e, loss_fm, loss_mel, loss_dur, loss_kl, loss_kl_fwd, global_step, lr]"
+                    )
+                    logger.info([x.item() for x in losses] + [global_step, lr])
+
+                    scalar_dict = {
+                        "loss/g/total": loss_gen_all,
+                        "loss/d/total": loss_disc_all,
+                        "learning_rate": lr,
+                        "grad_norm_d": grad_norm_d,
+                        "grad_norm_g": grad_norm_g,
                     }
-                )
+                    scalar_dict.update(
+                        {
+                            "loss/g/fm": loss_fm,
+                            "loss/g/mel": loss_mel,
+                            "loss/g/dur": loss_dur,
+                            "loss/g/kl": loss_kl,
+                            "loss/g/kl_fwd": loss_kl_fwd,
+                        }
+                    )
 
-                image_dict = {
-                    "slice/mel_org": utils.plot_spectrogram_to_numpy(
-                        y_mel[0].data.cpu().numpy()
-                    ),
-                    "slice/mel_gen": utils.plot_spectrogram_to_numpy(
-                        y_hat_mel[0].data.cpu().numpy()
-                    ),
-                    "all/mel": utils.plot_spectrogram_to_numpy(
-                        mel[0].data.cpu().numpy()
-                    ),
-                    "all/W0": utils.plot_spectrogram_to_numpy(
-                        W[0, 0, :, :].transpose(0, 1).data.cpu().numpy()
-                    ),
-                    "all/W1": utils.plot_spectrogram_to_numpy(
-                        W[0, 1, :, :].transpose(0, 1).data.cpu().numpy()
-                    ),
-                    "all/W2": utils.plot_spectrogram_to_numpy(
-                        W[0, 2, :, :].transpose(0, 1).data.cpu().numpy()
-                    ),
-                    "all/W3": utils.plot_spectrogram_to_numpy(
-                        W[0, 3, :, :].transpose(0, 1).data.cpu().numpy()
-                    ),
-                }
+                    image_dict = {
+                        "slice/mel_org": utils.plot_spectrogram_to_numpy(
+                            y_mel[0].data.cpu().numpy()
+                        ),
+                        "slice/mel_gen": utils.plot_spectrogram_to_numpy(
+                            y_hat_mel[0].data.cpu().numpy()
+                        ),
+                        "all/mel": utils.plot_spectrogram_to_numpy(
+                            mel[0].data.cpu().numpy()
+                        ),
+                        "all/W0": utils.plot_spectrogram_to_numpy(
+                            W[0, 0, :, :].transpose(0, 1).data.cpu().numpy()
+                        ),
+                        "all/W1": utils.plot_spectrogram_to_numpy(
+                            W[0, 1, :, :].transpose(0, 1).data.cpu().numpy()
+                        ),
+                        "all/W2": utils.plot_spectrogram_to_numpy(
+                            W[0, 2, :, :].transpose(0, 1).data.cpu().numpy()
+                        ),
+                        "all/W3": utils.plot_spectrogram_to_numpy(
+                            W[0, 3, :, :].transpose(0, 1).data.cpu().numpy()
+                        ),
+                    }
 
-                utils.summarize(
-                    writer=writer,
-                    global_step=global_step,
-                    images=image_dict,
-                    scalars=scalar_dict,
-                )
+                    utils.summarize(
+                        writer=writer,
+                        global_step=global_step,
+                        images=image_dict,
+                        scalars=scalar_dict,
+                    )
 
-        global_step += 1
+            global_step += 1
+        except Exception as e:
+            print(f"Error in batch {batch_idx} at epoch {epoch}: {e}. Skipping batch.")
 
     if rank == 0:
         logger.info("====> Epoch: {}".format(epoch))
